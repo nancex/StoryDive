@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StoryDive - 沉浸式剧本体验</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      colors: {
+        primary: { 50:'#eef2ff',100:'#e0e7ff',200:'#c7d2fe',300:'#a5b4fc',400:'#818cf8',500:'#6366f1',600:'#4f46e5',700:'#4338ca',800:'#3730a3',900:'#312e81' },
+        surface: { 50:'#f8fafc',100:'#f1f5f9',200:'#e2e8f0',300:'#cbd5e1',400:'#94a3b8',500:'#64748b',600:'#475569',700:'#334155',800:'#1e293b',900:'#0f172a' },
+        accent: { 400:'#f472b6',500:'#ec4899',600:'#db2777' }
+      }
+    }
+  }
+}
+</script>
+<style>@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&family=Noto+Serif+SC:wght@400;700&display=swap');
+body { font-family: 'Noto Sans SC', sans-serif; }
+.serif { font-family: 'Noto Serif SC', serif; }
+.view { display: none; }
+.view.active { display: block; }
+.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); z-index: 50; align-items: center; justify-content: center; }
+.modal-overlay.active { display: flex; }
+.modal-content { background: #1e293b; border: 1px solid #334155; border-radius: 1rem; max-width: 520px; width: 90%; max-height: 85vh; overflow-y: auto; padding: 1.75rem; animation: slideUp 0.25s ease; }
+@keyframes slideUp { from { transform: translateY(24px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.card-hover { transition: all 0.2s ease; }
+.card-hover:hover { transform: translateY(-4px); box-shadow: 0 12px 32px rgba(99,102,241,0.15); }
+.btn-primary { background: linear-gradient(135deg, #6366f1, #4f46e5); color: white; padding: 0.625rem 1.5rem; border-radius: 0.5rem; font-weight: 500; transition: all 0.2s; border: none; cursor: pointer; }
+.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 16px rgba(99,102,241,0.4); }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+.btn-danger { background: #dc2626; color: white; padding: 0.625rem 1.5rem; border-radius: 0.5rem; font-weight: 500; transition: all 0.2s; border: none; cursor: pointer; }
+.btn-danger:hover { background: #b91c1c; }
+.btn-ghost { color: #94a3b8; padding: 0.5rem 1rem; border-radius: 0.5rem; transition: all 0.2s; background: none; border: none; cursor: pointer; font-size: 0.875rem; }
+.btn-ghost:hover { background: rgba(255,255,255,0.06); color: #e2e8f0; }
+.nav-tab { padding: 0.5rem 1.25rem; border-radius: 0.5rem; color: #94a3b8; cursor: pointer; transition: all 0.2s; font-weight: 500; background: none; border: none; }
+.nav-tab:hover { color: #e2e8f0; background: rgba(255,255,255,0.05); }
+.nav-tab.active { color: #c7d2fe; background: rgba(99,102,241,0.15); }
+.input-field { width: 100%; padding: 0.625rem 0.875rem; background: #1e293b; border: 1px solid #334155; border-radius: 0.5rem; color: #f1f5f9; font-size: 0.875rem; transition: border-color 0.2s; box-sizing: border-box; }
+.input-field:focus { outline: none; border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,0.15); }
+.input-field::placeholder { color: #475569; }
+.tag { display: inline-block; padding: 0.15rem 0.6rem; background: rgba(99,102,241,0.15); color: #a5b4fc; border-radius: 9999px; font-size: 0.75rem; }
+.dialog-box { background: rgba(0,0,0,0.85); backdrop-filter: blur(12px); border-top: 1px solid rgba(255,255,255,0.06); user-select: none; -webkit-user-select: none; }
+.stage-overlay { display: none; position: fixed; inset: 0; z-index: 100; background: #0a0a0f; }
+.stage-overlay.active { display: flex; flex-direction: column; }
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+.preview-line { padding: 0.5rem 0.75rem; border-left: 2px solid #334155; margin: 0.25rem 0; color: #cbd5e1; font-size: 0.875rem; }
+.preview-line.dialogue { border-left-color: #6366f1; }
+.toast-visible { opacity: 1; transform: translate(-50%, 0); }
+</style>
+</head>
+<body class="bg-surface-900 text-surface-100 min-h-screen">
+
+<nav class="fixed top-0 left-0 right-0 z-40 bg-surface-900/95 backdrop-blur-md border-b border-surface-700/50">
+  <div class="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
+    <span class="text-lg font-bold bg-gradient-to-r from-primary-400 to-accent-400 bg-clip-text text-transparent">StoryDive</span>
+    <div class="flex items-center gap-1">
+      <button class="nav-tab active" data-view="browse" onclick="switchView('browse')">剧本浏览</button>
+      <button class="nav-tab" data-view="archive" onclick="switchView('archive')">故事存档</button>
+      <button class="nav-tab" data-view="settings" onclick="switchView('settings')">设置</button>
+    </div>
+  </div>
+</nav>
+
+<main class="pt-20 pb-12 px-4 max-w-6xl mx-auto">
+
+  <div id="view-browse" class="view active">
+    <div class="mb-8">
+      <h2 class="text-2xl font-bold mb-2">剧本浏览</h2>
+      <p class="text-surface-400">选择一个剧本，开始你的沉浸式故事体验</p>
+    </div>
+    <div id="books-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+      <div class="text-surface-400 col-span-full text-center py-12">加载中……</div>
+    </div>
+  </div>
+
+  <div id="view-archive" class="view">
+    <div class="mb-8">
+      <h2 class="text-2xl font-bold mb-2">故事存档</h2>
+      <p class="text-surface-400">继续你未完的故事</p>
+    </div>
+    <div id="saves-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div class="text-surface-400 col-span-full text-center py-12">加载中……</div>
+    </div>
+  </div>
+
+  <div id="view-settings" class="view">
+    <div class="mb-8">
+      <h2 class="text-2xl font-bold mb-2">设置</h2>
+      <p class="text-surface-400">配置大模型 API 与多媒体服务</p>
+    </div>
+    <div class="max-w-lg space-y-6">
+      <fieldset class="border border-surface-700 rounded-xl p-5">
+        <legend class="text-primary-300 font-semibold px-2">核心 LLM API</legend>
+        <div class="space-y-3">
+          <div><label class="text-sm text-surface-300">Base URL</label><input id="cfg-llm-url" class="input-field mt-1" placeholder="https://api.openai.com/v1"></div>
+          <div><label class="text-sm text-surface-300">API Key</label><input id="cfg-llm-key" class="input-field mt-1" type="password" placeholder="sk-..."></div>
+          <div><label class="text-sm text-surface-300">Model Name</label><input id="cfg-llm-model" class="input-field mt-1" placeholder="gpt-4o"></div><div><label class="text-sm text-surface-300">Timeout (seconds)</label><input id="cfg-llm-timeout" class="input-field mt-1" type="number" min="10" max="300" placeholder="60"></div>
+        </div>
+        <div class="flex justify-end mt-3"><button id="btn-test-llm" class="btn-primary text-xs px-4 py-1.5" onclick="testApi('llm')">测试连接</button></div>
+      </fieldset>
+      <fieldset class="border border-surface-700 rounded-xl p-5">
+        <legend class="text-pink-400 font-semibold px-2">插图模型 API</legend>
+        <div class="space-y-3">
+          <div><label class="text-sm text-surface-300">Base URL</label><input id="cfg-img-url" class="input-field mt-1" placeholder="https://api.openai.com/v1"></div>
+          <div><label class="text-sm text-surface-300">API Key</label><input id="cfg-img-key" class="input-field mt-1" type="password" placeholder="sk-..."></div>
+          <div><label class="text-sm text-surface-300">Model Name</label><input id="cfg-img-model" class="input-field mt-1" placeholder="dall-e-3"></div>
+        </div>
+        <div class="flex justify-end mt-3"><button id="btn-test-image" class="btn-primary text-xs px-4 py-1.5" onclick="testApi('image')">测试连接</button></div>
+      </fieldset>
+      <fieldset class="border border-surface-700 rounded-xl p-5">
+        <legend class="text-green-400 font-semibold px-2">本地 TTS 配置</legend>
+        <div class="space-y-3">
+          <div><label class="text-sm text-surface-300">TTS 服务端口（API 地址）</label><input id="cfg-tts" class="input-field mt-1" placeholder="http://localhost:9880"></div>
+        </div>
+        <div class="flex justify-end mt-3"><button id="btn-test-tts" class="btn-primary text-xs px-4 py-1.5" onclick="testApi('tts')">测试连接</button></div>
+      </fieldset>
+      <button class="btn-primary w-full" onclick="saveSettings()">保存设置</button>
+    </div>
+  </div>
+</main>
+
+<div id="book-modal" class="modal-overlay" onclick="if(event.target===this)closeBookModal()">
+  <div class="modal-content">
+    <div class="flex items-start justify-between mb-4">
+      <h3 id="bm-title" class="text-xl font-bold text-white"></h3>
+      <button onclick="closeBookModal()" class="text-surface-400 hover:text-white text-2xl leading-none">&times;</button>
+    </div>
+    <div class="space-y-3 text-sm">
+      <div class="flex gap-2 flex-wrap" id="bm-tags"></div>
+      <div class="grid grid-cols-2 gap-2 text-surface-300">
+        <div><span class="text-surface-500">原作</span><br><span id="bm-oauthor" class="text-surface-100"></span></div>
+        <div><span class="text-surface-500">剧本作者</span><br><span id="bm-author" class="text-surface-100"></span></div>
+        <div><span class="text-surface-500">上传日期</span><br><span id="bm-date" class="text-surface-100"></span></div>
+        <div><span class="text-surface-500">主角</span><br><span id="bm-protagonist" class="text-surface-100"></span></div>
+      </div>
+      <div><span class="text-surface-500 text-xs">简介</span><p id="bm-desc" class="text-surface-200 leading-relaxed mt-1"></p></div>
+    </div>
+    <div class="flex gap-3 mt-6">
+      <button id="bm-start-btn" class="btn-primary flex-1" onclick="startBook()">开始新剧本</button>
+      <button id="bm-continue-btn" class="btn-ghost" style="display:none" onclick="continueBook()">继续剧本</button>
+    </div>
+  </div>
+</div>
+
+<div id="save-modal" class="modal-overlay" onclick="if(event.target===this)closeSaveModal()">
+  <div class="modal-content">
+    <div class="flex items-start justify-between mb-4">
+      <h3 id="sm-title" class="text-xl font-bold text-white"></h3>
+      <button onclick="closeSaveModal()" class="text-surface-400 hover:text-white text-2xl leading-none">&times;</button>
+    </div>
+    <div class="space-y-3 text-sm">
+      <div class="text-surface-400"><span id="sm-book"></span> &middot; <span id="sm-date"></span></div>
+      <div><span class="text-surface-500 text-xs">故事预览（最后段落）</span>
+        <div id="sm-preview" class="mt-2 space-y-1"></div>
+      </div>
+    </div>
+    <div class="flex gap-3 mt-6">
+      <button class="btn-primary flex-1" onclick="continueSave()">继续故事</button>
+      <button class="btn-danger" onclick="deleteSave()">删除存档</button>
+    </div>
+  </div>
+</div>
+
+<div id="confirm-modal" class="modal-overlay" style="z-index:200" onclick="if(event.target===this)closeConfirm(false)">
+  <div class="modal-content" style="max-width:400px">
+    <h3 id="confirm-title" class="text-lg font-bold text-white mb-2"></h3>
+    <p id="confirm-message" class="text-surface-300 text-sm mb-6"></p>
+    <div class="flex gap-3 justify-end">
+      <button class="btn-ghost" onclick="closeConfirm(false)">取消</button>
+      <button class="btn-danger" id="confirm-ok-btn" onclick="closeConfirm(true)">确认删除</button>
+    </div>
+  </div>
+</div>
+
+<div id="game-stage" class="stage-overlay">
+  <div class="flex-1 relative overflow-hidden" id="stage-bg" style="background: radial-gradient(ellipse at center, #1e1b4b 0%, #0f0f1a 70%);">
+    <div id="stage-scene" class="absolute inset-0 bg-cover bg-center opacity-40"></div>
+    <div id="stage-sprites" class="absolute inset-0 flex items-end justify-center pb-32"></div>
+    <div class="absolute top-0 left-0 right-0 p-4 flex items-center justify-between z-10">
+      <button onclick="exitStage()" class="btn-ghost">&times; 退出</button>
+      <span id="stage-title" class="text-surface-400 text-sm"></span>
+      <div></div>
+    </div>
+    <button id="btn-history" class="absolute right-4 bottom-36 z-20 w-12 h-12 rounded-full bg-surface-800/80 border border-surface-600 flex items-center justify-center text-sm hover:bg-surface-700 transition-all" onclick="toggleHistory()" title="历史回顾">历史</button>
+  </div>
+  <div id="history-overlay" class="fixed inset-0 bg-black/90 backdrop-blur-sm z-30 hidden" style="display:none">
+        <div class="flex items-center justify-between p-4 border-b border-surface-700">
+          <span class="font-bold text-white">历史文本回顾</span>
+          <div class="flex gap-3 items-center">
+            <label class="flex items-center gap-1 text-xs text-surface-400 cursor-pointer"><input type="checkbox" id="hist-show-speaker" onchange="renderHistory()"> 显示说话主体</label>
+            <button class="btn-ghost" onclick="exportHistory()">导出文本</button>
+            <button class="text-surface-400 hover:text-white text-xl" onclick="toggleHistory()">&times;</button>
+          </div>
+        </div>
+        <div id="history-content" class="flex-1 overflow-y-auto p-6 serif text-surface-200 leading-loose text-sm"></div>
+      </div>
+  <div class="dialog-box p-5 min-h-[160px] cursor-pointer relative" id="dialog-area" onclick="advanceParagraph()">
+    <div id="dialog-speaker" class="text-primary-300 font-bold text-lg mb-1 min-h-[1.5rem]"></div>
+    <div id="dialog-text" class="text-surface-100 text-base leading-relaxed serif"></div>
+    <div id="dialog-hint" class="text-surface-500 text-xs mt-3">点击继续</div>
+  </div>
+  <div class="bg-surface-900/95 border-t border-surface-700/50 p-3">
+    <div class="flex gap-3 items-end max-w-4xl mx-auto">
+      <div class="flex-1">
+        <textarea id="action-input" class="input-field resize-none" rows="2" placeholder="输入你的行动或对话……" disabled></textarea>
+      </div>
+      <div class="flex flex-col gap-2">
+        <div class="flex gap-2">
+          <label class="flex items-center gap-1 text-xs text-surface-400 cursor-pointer"><input type="checkbox" id="toggle-speak" onchange="updateActionMode()"> Speak</label>
+          <label class="flex items-center gap-1 text-xs text-surface-400 cursor-pointer"><input type="checkbox" id="toggle-regret" onchange="updateActionMode()"> Regret</label>
+          <label class="flex items-center gap-1 text-xs text-surface-400 cursor-pointer"><input type="checkbox" id="toggle-accelerate" onchange="updateActionMode()"> Accel</label>
+        </div>
+        <button id="btn-submit" class="btn-primary text-sm px-4 py-2" onclick="submitAction()" disabled>发送</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="fixed bottom-6 left-1/2 z-50 text-white px-6 py-3 rounded-xl shadow-lg text-sm font-medium transition-all duration-300 pointer-events-none" style="max-width:90vw;opacity:0;transform:translate(-50%,16px)"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
