@@ -10,7 +10,7 @@ echo.
 cd /d "F:\.workspace\StoryDive"
 
 echo [1/2] Starting backend (port 8800)...
-start "StoryDive Backend" ".venv\Scripts\python.exe" "backend\server.py"
+start "StoryDive Backend" ".venv\Scripts\python.exe" -m backend.server
 
 echo [2/2] Waiting for server...
 :wait
