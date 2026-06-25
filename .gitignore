@@ -22,3 +22,4 @@ settings.json
 backend/run.log
 backend/server_log.txt
 saves/save_*
+books/
