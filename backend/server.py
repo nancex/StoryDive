@@ -38,7 +38,7 @@ class ActionRequest(BaseModel):
 class SettingsData(BaseModel):
     llm_base_url: str = ''; llm_api_key: str = ''; llm_model: str = ''
     image_base_url: str = ''; image_api_key: str = ''; image_model: str = ''
-    tts_endpoint: str = ''; llm_timeout: int = 60
+    tts_endpoint: str = ''; llm_timeout: int = 60; llm_debug: bool = False
 
 def load_json(p): 
     with open(p,'r',encoding='utf-8') as f: return json.load(f)
@@ -92,12 +92,17 @@ async def call_llm(messages, settings):
     key = settings.get("llm_api_key","")
     model = settings.get("llm_model","") or "gpt-4o"
     payload = {"model":model,"messages":messages,"temperature":0.8,"max_tokens":2048}
+    debug = settings.get("llm_debug", False)
+    if debug:
+        print(f"\n=== LLM REQUEST ===\nURL: {url}\nModel: {model}\nPayload:\n{json.dumps(payload, ensure_ascii=False, indent=2)}\n=== END REQUEST ===")
     headers = {"Authorization":f"Bearer {key}","Content-Type":"application/json"}
     import httpx
     to = settings.get('llm_timeout', 60) or 60
     async with httpx.AsyncClient(timeout=httpx.Timeout(float(to), connect=10.0)) as client:
         resp = await client.post(url, json=payload, headers=headers)
         resp.raise_for_status()
+        if debug:
+            print(f"\n=== LLM RESPONSE ===\nStatus: {resp.status_code}\nBody:\n{json.dumps(resp.json(), ensure_ascii=False, indent=2)}\n=== END RESPONSE ===")
         return resp.json()["choices"][0]["message"]["content"]
 
 def build_system_prompt(book_id):
