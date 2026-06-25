@@ -13,6 +13,9 @@ var actionMode = 'normal';
 var bookDetailCache = {};
 var genStartTime = 0;
 var genTimerInterval = null;
+var currentMemo = '';
+var currentReferenceSections = [];
+var availableSections = [];
 
 function startGenTimer(btn) {
   genStartTime = Date.now();
@@ -212,6 +215,7 @@ async function openBookModal(bookId) {
 function closeBookModal() { document.getElementById('book-modal').classList.remove('active'); }
 
 async function openSavePicker(bookId, saves) {
+  currentBookId = bookId;
   currentSaveId = saves[0].id;
   if (!await checkApiHealth()) return;
   if (!await checkLlmHealth()) return;
@@ -232,7 +236,10 @@ async function openSavePicker(bookId, saves) {
       paragraphQueue = [{'type':'narration','text':'[Empty story]'}];
     }
     paragraphIndex = 0;
+    currentMemo = data.memo || '';
+    currentReferenceSections = data.reference_sections || [];
     document.getElementById('stage-title').textContent = data.book_title;
+    loadAvailableSections();
     renderParagraph();
   } catch(e) {
     showToast('加载存档失败：' + e.message, 'error');
@@ -269,11 +276,18 @@ async function startBook() {
   }
   var data = await res.json();
   stopGenTimer(document.getElementById('bm-start-btn'), '开始新剧本');
+  if (data.error || res.status >= 400) {
+    showToast('生成失败：' + (data.error || data.detail || '未知错误'), 'error');
+    return;
+  }
   closeBookModal();
   currentSaveId = data.save_id;
-  paragraphQueue = data.paragraph_queue;
+  paragraphQueue = data.paragraph_queue || [];
   paragraphIndex = 0;
   storyHistory = [];
+  currentMemo = data.memo || '';
+  currentReferenceSections = data.reference_sections || [];
+  loadAvailableSections();
   enterGameStage(data.book_title);
 }
 
@@ -346,6 +360,10 @@ async function continueSave() {
       paragraphQueue = [{'type':'narration','text':'[Empty story]'}];
     }
     paragraphIndex = 0;
+    currentBookId = data.book_id || currentBookId;
+    currentMemo = data.memo || '';
+    currentReferenceSections = data.reference_sections || [];
+    loadAvailableSections();
     enterGameStage(data.book_title);
   } catch(e) {
     showToast('加载存档失败：' + e.message, 'error');
@@ -375,6 +393,7 @@ async function loadSettings() {
     document.getElementById('cfg-img-model').value = s.image_model || '';
     document.getElementById('cfg-tts').value = s.tts_endpoint || '';
     document.getElementById('cfg-llm-timeout').value = s.llm_timeout || 60;
+    document.getElementById('cfg-llm-reasoning').checked = s.llm_reasoning || false;
   } catch(e) {}
 }
 
@@ -387,7 +406,8 @@ async function saveSettings() {
     image_api_key: document.getElementById('cfg-img-key').value,
     image_model: document.getElementById('cfg-img-model').value,
     tts_endpoint: document.getElementById('cfg-tts').value,
-    llm_timeout: parseInt(document.getElementById('cfg-llm-timeout').value) || 60
+    llm_timeout: parseInt(document.getElementById('cfg-llm-timeout').value) || 60,
+    llm_reasoning: document.getElementById('cfg-llm-reasoning').checked
   };
   await fetch(API + '/settings', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
   showToast('设置已保存', 'success');
@@ -516,11 +536,15 @@ function updateToggleStates() {
   document.getElementById('toggle-accelerate').checked = actionMode === 'accelerate';
 }
 
+var _submitting = false;
+
 async function submitAction() {
+  if (_submitting) return;
   var input = document.getElementById('action-input');
   var text = input.value.trim();
   if (!text) return;
   if (!await checkApiHealth()) return;
+  _submitting = true;
   input.value = '';
   var btn = document.getElementById('btn-submit');
   var origText = btn.textContent;
@@ -550,12 +574,27 @@ async function submitAction() {
   }
   var data = await res.json();
   stopGenTimer(btn, origText);
-  paragraphQueue = data.paragraph_queue;
+  if (data.error) {
+    showToast('生成失败：' + data.error, 'error');
+    _submitting = false;
+    setActionInputDisabled(false);
+    return;
+  }
+  paragraphQueue = data.paragraph_queue || [];
+  if (!paragraphQueue.length) {
+    showToast('LLM 未返回有效内容，请重试', 'error');
+    _submitting = false;
+    setActionInputDisabled(false);
+    return;
+  }
   paragraphIndex = 0;
+  _submitting = false;
   setActionInputDisabled(true);
   renderParagraph();
   actionMode = 'normal';
   updateToggleStates();
+  // Reload memo/refs in case LLM updated them via tools
+  reloadMemoAndRefs();
 }
 
 // ── HISTORY ──
@@ -597,6 +636,97 @@ function exportHistory() {
   a.click(); URL.revokeObjectURL(url);
 }
 
+// ── MEMO & REFERENCE MANAGEMENT ──
+async function reloadMemoAndRefs() {
+  if (!currentSaveId) return;
+  try {
+    var res = await fetch(API + '/saves/' + currentSaveId);
+    var data = await res.json();
+    currentMemo = data.memo || '';
+    currentReferenceSections = data.reference_sections || [];
+  } catch(e) {}
+}
+
+async function loadAvailableSections() {
+  if (!currentBookId) return;
+  try {
+    var res = await fetch(API + '/books/' + currentBookId + '/sections');
+    var data = await res.json();
+    availableSections = data.sections || [];
+  } catch(e) {}
+}
+
+function openMemoPanel() {
+  var ta = document.getElementById('memo-textarea');
+  var modal = document.getElementById('memo-modal');
+  if (!ta || !modal) return;
+  ta.value = currentMemo || '';
+  modal.classList.add('active');
+}
+
+function closeMemoPanel() {
+  document.getElementById('memo-modal').classList.remove('active');
+}
+
+async function saveMemo() {
+  var text = document.getElementById('memo-textarea').value;
+  try {
+    var res = await fetch(API + '/saves/' + currentSaveId + '/memo', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ memo: text })
+    });
+    if (res.ok) {
+      currentMemo = text;
+      showToast('备忘录已保存', 'success');
+      closeMemoPanel();
+    } else {
+      showToast('保存失败', 'error');
+    }
+  } catch(e) {
+    showToast('保存失败：' + e.message, 'error');
+  }
+}
+
+function openRefsPanel() {
+  var container = document.getElementById('refs-checkboxes');
+  var modal = document.getElementById('refs-modal');
+  if (!container || !modal) return;
+  var sections = availableSections || [];
+  container.innerHTML = sections.map(function(s) {
+    var checked = currentReferenceSections.indexOf(s) >= 0 ? ' checked' : '';
+    return '<label class="flex items-center gap-2 p-2 hover:bg-surface-800 rounded cursor-pointer">' +
+      '<input type="checkbox" value="' + escHtml(s) + '" class="ref-checkbox"' + checked + '>' +
+      '<span class="text-sm text-surface-300">' + escHtml(s) + '</span></label>';
+  }).join('');
+  modal.classList.add('active');
+}
+
+function closeRefsPanel() {
+  document.getElementById('refs-modal').classList.remove('active');
+}
+
+async function saveReferenceSections() {
+  var checkboxes = document.querySelectorAll('.ref-checkbox:checked');
+  var sections = Array.from(checkboxes).map(function(cb) { return cb.value; });
+  try {
+    var res = await fetch(API + '/saves/' + currentSaveId + '/reference', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sections: sections })
+    });
+    if (res.ok) {
+      currentReferenceSections = sections;
+      showToast('参考小节已更新（将在下次生成时生效）', 'success');
+      closeRefsPanel();
+    } else {
+      showToast('保存失败', 'error');
+    }
+  } catch(e) {
+    showToast('保存失败：' + e.message, 'error');
+  }
+}
+
 // ── HELPERS ──
 function escHtml(s) {
   if (!s) return '';
@@ -606,3 +736,12 @@ function escHtml(s) {
 // ── INIT ──
 loadBooks();
 loadSettings();
+
+
+
+
+
+
+
+
+

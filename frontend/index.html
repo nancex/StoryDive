@@ -101,6 +101,7 @@ body { font-family: 'Noto Sans SC', sans-serif; }
           <div><label class="text-sm text-surface-300">Base URL</label><input id="cfg-llm-url" class="input-field mt-1" placeholder="https://api.openai.com/v1"></div>
           <div><label class="text-sm text-surface-300">API Key</label><input id="cfg-llm-key" class="input-field mt-1" type="password" placeholder="sk-..."></div>
           <div><label class="text-sm text-surface-300">Model Name</label><input id="cfg-llm-model" class="input-field mt-1" placeholder="gpt-4o"></div><div><label class="text-sm text-surface-300">Timeout (seconds)</label><input id="cfg-llm-timeout" class="input-field mt-1" type="number" min="10" max="300" placeholder="60"></div>
+          <div class="flex items-center gap-2 pt-1"><input type="checkbox" id="cfg-llm-reasoning" class="w-4 h-4 rounded border-surface-600 bg-surface-800 text-primary-500 focus:ring-primary-500"><label for="cfg-llm-reasoning" class="text-sm text-surface-300 cursor-pointer">启用深度推理（仅 deepseek-* 模型生效）</label></div>
         </div>
         <div class="flex justify-end mt-3"><button id="btn-test-llm" class="btn-primary text-xs px-4 py-1.5" onclick="testApi('llm')">测试连接</button></div>
       </fieldset>
@@ -187,8 +188,11 @@ body { font-family: 'Noto Sans SC', sans-serif; }
       <span id="stage-title" class="text-surface-400 text-sm"></span>
       <div></div>
     </div>
-    <button id="btn-history" class="absolute right-4 bottom-36 z-20 w-12 h-12 rounded-full bg-surface-800/80 border border-surface-600 flex items-center justify-center text-sm hover:bg-surface-700 transition-all" onclick="toggleHistory()" title="历史回顾">历史</button>
   </div>
+      <button id="btn-refs" class="fixed z-[110] w-12 h-12 rounded-full bg-surface-800/80 border border-surface-600 flex items-center justify-center text-sm hover:bg-surface-700 transition-all" onclick="openRefsPanel()" title="参考小节" style="right:16px; bottom:452px">参考</button>
+    <button id="btn-memo" class="fixed z-[110] w-12 h-12 rounded-full bg-surface-800/80 border border-surface-600 flex items-center justify-center text-sm hover:bg-surface-700 transition-all" onclick="openMemoPanel()" title="备忘录" style="right:16px; bottom:356px">备忘</button>
+    <button id="btn-history" class="fixed z-[110] w-12 h-12 rounded-full bg-surface-800/80 border border-surface-600 flex items-center justify-center text-sm hover:bg-surface-700 transition-all" onclick="toggleHistory()" title="历史回顾" style="right:16px; bottom:260px">历史</button>
+
   <div id="history-overlay" class="fixed inset-0 bg-black/90 backdrop-blur-sm z-30 hidden" style="display:none">
         <div class="flex items-center justify-between p-4 border-b border-surface-700">
           <span class="font-bold text-white">历史文本回顾</span>
@@ -222,8 +226,43 @@ body { font-family: 'Noto Sans SC', sans-serif; }
   </div>
 </div>
 
+<!-- Memo Modal -->
+<div id="memo-modal" class="modal-overlay" style="z-index:200" onclick="if(event.target===this)closeMemoPanel()">
+  <div class="modal-content" style="max-width:600px">
+    <div class="flex items-start justify-between mb-4">
+      <h3 class="text-xl font-bold text-white">📝 备忘录</h3>
+      <button onclick="closeMemoPanel()" class="text-surface-400 hover:text-white text-2xl leading-none">&times;</button>
+    </div>
+    <p class="text-surface-400 text-xs mb-3">此处记录故事中的重要状态、角色关系和剧情线索。LLM 在生成时会读取此内容，你也可以手动编辑。</p>
+    <textarea id="memo-textarea" class="input-field" rows="10" style="font-size:0.875rem;resize:vertical;min-height:200px" placeholder="备忘录内容……"></textarea>
+    <div class="flex gap-3 mt-4 justify-end">
+      <button class="btn-ghost" onclick="closeMemoPanel()">取消</button>
+      <button class="btn-primary" onclick="saveMemo()">保存备忘录</button>
+    </div>
+  </div>
+</div>
+
+<!-- Reference Sections Modal -->
+<div id="refs-modal" class="modal-overlay" style="z-index:200" onclick="if(event.target===this)closeRefsPanel()">
+  <div class="modal-content" style="max-width:500px">
+    <div class="flex items-start justify-between mb-4">
+      <h3 class="text-xl font-bold text-white">📖 参考原文小节</h3>
+      <button onclick="closeRefsPanel()" class="text-surface-400 hover:text-white text-2xl leading-none">&times;</button>
+    </div>
+    <p class="text-surface-400 text-xs mb-3">勾选需要在生成时参考的原文小节。LLM 也会自行决定增加或删减。小节越多生成越准确，但消耗更多 token。</p>
+    <div id="refs-checkboxes" class="space-y-1 max-h-60 overflow-y-auto bg-surface-900 rounded-lg p-2"></div>
+    <div class="flex gap-3 mt-4 justify-end">
+      <button class="btn-ghost" onclick="closeRefsPanel()">取消</button>
+      <button class="btn-primary" onclick="saveReferenceSections()">确认选择</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast" class="fixed bottom-6 left-1/2 z-50 text-white px-6 py-3 rounded-xl shadow-lg text-sm font-medium transition-all duration-300 pointer-events-none" style="max-width:90vw;opacity:0;transform:translate(-50%,16px)"></div>
 
 <script src="app.js"></script>
 </body>
 </html>
+
+
+
