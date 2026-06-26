@@ -5,11 +5,13 @@ from .config import BOOKS_DIR, SAVES_DIR
 from .models import (
     BookBrief, BookDetail, SaveBrief, SaveDetail,
     ActionRequest, SettingsData, MemoUpdateRequest, ReferenceUpdateRequest,
+    ProfileSwitchRequest, ProfileCreateRequest,
 )
 from .utils import (
     load_json, load_md, save_md, parse_story_to_paragraphs,
     get_save_count, get_saves_for_book, load_save_config, save_save_config,
     pars_to_story, append_to_story, prune_story, load_settings,
+    load_all_settings, save_all_settings,
     list_available_sections,
 )
 from .llm import generate_narrative
@@ -232,9 +234,65 @@ def get_settings():
 
 @router.post("/settings")
 def save_settings(data: SettingsData):
-    from .config import BASE_DIR
-    sp = BASE_DIR / "settings.json"
-    with open(sp, "w", encoding="utf-8") as f:
-        json.dump(data.model_dump(), f, ensure_ascii=False, indent=2)
+    all_data = load_all_settings()
+    active = all_data["active_profile"]
+    all_data["profiles"][active] = data.model_dump()
+    save_all_settings(all_data)
     return {"status": "ok"}
+
+# ---- PROFILES ----
+@router.get("/profiles")
+def list_profiles():
+    all_data = load_all_settings()
+    return {
+        "active_profile": all_data["active_profile"],
+        "profiles": list(all_data["profiles"].keys()),
+    }
+
+@router.post("/profiles/switch")
+def switch_profile(req: ProfileSwitchRequest):
+    all_data = load_all_settings()
+    if req.name not in all_data["profiles"]:
+        raise HTTPException(404, "Profile not found")
+    all_data["active_profile"] = req.name
+    save_all_settings(all_data)
+    return {
+        "active_profile": req.name,
+        "settings": all_data["profiles"][req.name],
+    }
+
+@router.post("/profiles/create")
+def create_profile(req: ProfileCreateRequest):
+    from .models import SettingsData
+    all_data = load_all_settings()
+    name = req.name.strip()
+    if not name:
+        raise HTTPException(400, "Profile name cannot be empty")
+    if name in all_data["profiles"]:
+        raise HTTPException(400, "Profile already exists")
+    all_data["profiles"][name] = SettingsData().model_dump()
+    all_data["active_profile"] = name
+    save_all_settings(all_data)
+    return {
+        "active_profile": name,
+        "profiles": list(all_data["profiles"].keys()),
+        "settings": all_data["profiles"][name],
+    }
+
+@router.delete("/profiles/{name}")
+def delete_profile(name: str):
+    all_data = load_all_settings()
+    if name not in all_data["profiles"]:
+        raise HTTPException(404, "Profile not found")
+    if len(all_data["profiles"]) <= 1:
+        raise HTTPException(400, "Cannot delete the last profile")
+    del all_data["profiles"][name]
+    if all_data["active_profile"] == name:
+        all_data["active_profile"] = list(all_data["profiles"].keys())[0]
+    save_all_settings(all_data)
+    return {
+        "active_profile": all_data["active_profile"],
+        "profiles": list(all_data["profiles"].keys()),
+    }
+
 

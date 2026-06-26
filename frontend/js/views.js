@@ -8,5 +8,6 @@ function switchView(view) {
   if (tab) tab.classList.add('active');
   if (view === 'browse') loadBooks();
   if (view === 'archive') loadSaves();
-  if (view === 'settings') loadSettings();
+  if (view === 'settings') { loadSettings(); } else { hideProfileSidebar(); }
 }
+

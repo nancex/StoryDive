@@ -3,15 +3,13 @@ async function loadSettings() {
   try {
     var res = await fetch(API + '/settings');
     var s = await res.json();
-    document.getElementById('cfg-llm-url').value = s.llm_base_url || '';
-    document.getElementById('cfg-llm-key').value = s.llm_api_key || '';
-    document.getElementById('cfg-llm-model').value = s.llm_model || '';
-    document.getElementById('cfg-img-url').value = s.image_base_url || '';
-    document.getElementById('cfg-img-key').value = s.image_api_key || '';
-    document.getElementById('cfg-img-model').value = s.image_model || '';
-    document.getElementById('cfg-tts').value = s.tts_endpoint || '';
-    document.getElementById('cfg-llm-timeout').value = s.llm_timeout || 60;
-    document.getElementById('cfg-llm-extra-body').value = s.llm_extra_body || '';
+    populateSettingsForm(s);
+    // Only show profile sidebar if settings view is active
+    var settingsView = document.getElementById('view-settings');
+    if (settingsView && settingsView.classList.contains('active')) {
+      loadProfileList();
+      showProfileSidebar();
+    }
   } catch(e) {}
 }
 
@@ -30,4 +28,6 @@ async function saveSettings() {
   await fetch(API + '/settings', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
   showToast('设置已保存', 'success');
 }
+
+
 

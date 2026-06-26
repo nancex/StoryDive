@@ -104,7 +104,39 @@ def prune_story(sid, idx):
     save_md(sp, "\n".join(lines) + ("\n" if lines else ""))
 
 def load_settings():
+    """Return the active profile's settings dict."""
     from .models import SettingsData
     sp = BOOKS_DIR.parent / "settings.json"
-    return load_json(sp) if sp.exists() else SettingsData().model_dump()
+    if not sp.exists():
+        return SettingsData().model_dump()
+    data = load_json(sp)
+    # Auto-migrate old flat format to profiled format
+    if "profiles" not in data:
+        data = {"active_profile": "默认", "profiles": {"默认": data}}
+        save_json(sp, data)
+    active = data.get("active_profile", "默认")
+    return data["profiles"].get(active, SettingsData().model_dump())
+
+def load_all_settings():
+    """Return the full settings dict (active_profile + profiles). Auto-migrates old format."""
+    from .models import SettingsData
+    sp = BOOKS_DIR.parent / "settings.json"
+    if not sp.exists():
+        return {"active_profile": "默认", "profiles": {"默认": SettingsData().model_dump()}}
+    data = load_json(sp)
+    if "profiles" not in data:
+        data = {"active_profile": "默认", "profiles": {"默认": data}}
+        save_json(sp, data)
+    return data
+
+def save_all_settings(data):
+    """Save the full settings dict to disk."""
+    sp = BOOKS_DIR.parent / "settings.json"
+    save_json(sp, data)
+
+def save_json(p, data):
+    """Save a dict as JSON file."""
+    with open(p, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
 

@@ -61,7 +61,21 @@ body { font-family: 'Noto Sans SC', sans-serif; }
 .toggle-switch input:checked + .toggle-slider::before { transform: translateX(16px); background: #fff; }
 button:focus { outline: none; }
 
-</style>
+button:focus-visible { outline: 2px solid #6366f1; outline-offset: 2px; }
+.profile-sidebar { position: fixed; right: 16px; top: 50%; transform: translateY(-50%); z-index: 30; background: #1e293b; border: 1px solid #334155; border-radius: 1rem; padding: 1rem; width: 180px; max-height: 60vh; overflow-y: auto; display: none; box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
+.profile-sidebar.active { display: block; }
+.profile-sidebar h3 { color: #a5b4fc; font-size: 0.75rem; font-weight: 600; margin-bottom: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; }
+.profile-item { display: block; width: 100%; text-align: left; padding: 0.5rem 0.75rem; border-radius: 0.5rem; font-size: 0.8rem; color: #cbd5e1; background: none; border: 1px solid transparent; cursor: pointer; transition: all 0.15s; margin-bottom: 0.25rem; }
+.profile-item:hover { background: rgba(99,102,241,0.1); border-color: #334155; }
+.profile-item.active { background: rgba(99,102,241,0.2); border-color: #6366f1; color: #e0e7ff; font-weight: 500; }
+.profile-item .del-btn { float: right; opacity: 0; transition: opacity 0.15s; color: #f87171; font-size: 0.7rem; line-height: 1.4; background: none; border: none; cursor: pointer; padding: 0; }
+.profile-item:hover .del-btn { opacity: 0.7; }
+.profile-item .del-btn:hover { opacity: 1; }
+.profile-add-row { display: flex; margin-top: 0.5rem; border-radius: 0.5rem; overflow: hidden; border: 1px solid #334155; }
+.profile-add-row input { flex: 1; padding: 0.5rem 0.5rem; background: #0f172a; border: none; color: #f1f5f9; font-size: 0.8rem; outline: none; min-width: 0; }
+.profile-add-row input:focus { background: #1a1f2e; }
+.profile-add-row button { padding: 0.5rem 0.65rem; background: #6366f1; color: white; border: none; font-size: 0.8rem; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
+.profile-add-row button:hover { background: #4f46e5; }</style>
 </head>
 <body class="bg-surface-900 text-surface-100 min-h-screen">
 
@@ -131,6 +145,14 @@ button:focus { outline: none; }
         <div class="flex justify-end mt-3"><button id="btn-test-tts" class="btn-primary text-xs px-4 py-1.5" onclick="testApi('tts')">测试连接</button></div>
       </fieldset>
       <button class="btn-primary w-full" onclick="saveSettings()">保存设置</button>
+    </div>
+  </div>
+  <div class="profile-sidebar" id="profile-sidebar">
+    <h3>Profiles</h3>
+    <div id="profile-list"></div>
+    <div class="profile-add-row">
+      <input id="new-profile-name" placeholder="新建…" maxlength="20">
+      <button onclick="createProfile()">+</button>
     </div>
   </div>
 </main>
@@ -276,6 +298,7 @@ button:focus { outline: none; }
 <script src="js/browse.js"></script>
 <script src="js/archive.js"></script>
 <script src="js/settings.js"></script>
+<script src="js/profiles.js"></script>
 <script src="js/game.js"></script>
 <script src="js/history.js"></script>
 <script src="js/memo.js"></script>
@@ -286,6 +309,11 @@ button:focus { outline: none; }
 </script>
 </body>
 </html>
+
+
+
+
+
 
 
 

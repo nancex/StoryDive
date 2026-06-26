@@ -66,3 +66,9 @@ class ReferenceUpdateRequest(BaseModel):
     sections: List[str]
 
 
+
+class ProfileSwitchRequest(BaseModel):
+    name: str
+
+class ProfileCreateRequest(BaseModel):
+    name: str
