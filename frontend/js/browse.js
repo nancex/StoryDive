@@ -53,6 +53,7 @@ async function openBookModal(bookId) {
   } else {
     contBtn.style.display = 'none';
   }
+  document.getElementById('bm-start-btn').textContent = '开始新剧本';
   document.getElementById('book-modal').classList.add('active');
 }
 
@@ -96,18 +97,29 @@ async function startBook() {
   if (!await checkApiHealth()) return;
   if (!await checkLlmHealth()) return;
   var startBtn = document.getElementById('bm-start-btn');
+
+  var streaming = document.getElementById('cfg-streaming') && document.getElementById('cfg-streaming').checked;
+
+  if (streaming) {
+    await startBookStreaming(startBtn);
+  } else {
+    await startBookNormal(startBtn);
+  }
+}
+
+async function startBookNormal(startBtn) {
   startGenTimer(startBtn);
   var res;
   try {
     res = await fetch(API + '/books/' + currentBookId + '/start', { method: 'POST' });
   } catch(e) {
     showToast('请求失败：' + e.message, 'error');
-    stopGenTimer(document.getElementById('bm-start-btn'), '开始新剧本');
+    stopGenTimer(startBtn, '开始新剧本');
     return;
   }
   var data = await res.json();
-  stopGenTimer(document.getElementById('bm-start-btn'), '开始新剧本');
   if (data.error || res.status >= 400) {
+    stopGenTimer(startBtn, '开始新剧本');
     showToast('生成失败：' + (data.error || data.detail || '未知错误'), 'error');
     return;
   }
@@ -118,8 +130,41 @@ async function startBook() {
   storyHistory = [];
   currentMemo = data.memo || '';
   currentReferenceSections = data.reference_sections || [];
+  stopGenTimer(startBtn, '开始新剧本');
   loadAvailableSections();
   enterGameStage(data.book_title);
+}
+
+async function startBookStreaming(startBtn) {
+  startGenTimer(startBtn);
+  var res;
+  try {
+    res = await fetch(API + '/books/' + currentBookId + '/start?comprehension_only=true', { method: 'POST' });
+  } catch(e) {
+    showToast('请求失败：' + e.message, 'error');
+    stopGenTimer(startBtn, '开始新剧本');
+    return;
+  }
+  var data = await res.json();
+  if (data.error || res.status >= 400) {
+    stopGenTimer(startBtn, '开始新剧本');
+    showToast('生成失败：' + (data.error || data.detail || '未知错误'), 'error');
+    return;
+  }
+  currentSaveId = data.save_id;
+  storyHistory = [];
+  currentMemo = data.memo || '';
+  currentReferenceSections = data.reference_sections || [];
+  _streamingQueue = [];
+  _streamingCurrentIdx = 0;
+  _streamingDone = false;
+  _streamAbort = null;
+  _lastHistoryIdx = -1;
+  paragraphQueue = [];
+  paragraphIndex = 0;
+  loadAvailableSections();
+  // Stay on browse view until first content arrives from streaming
+  await submitActionStream('', false, false, false, data.book_title, true, startBtn);
 }
 
 async function continueBook() {
@@ -127,3 +172,5 @@ async function continueBook() {
   var saves = window._currentBookSaves || [];
   if (saves.length > 0) await openSavePicker(currentBookId, saves);
 }
+
+

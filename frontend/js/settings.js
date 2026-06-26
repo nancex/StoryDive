@@ -23,11 +23,20 @@ async function saveSettings() {
     image_model: document.getElementById('cfg-img-model').value,
     tts_endpoint: document.getElementById('cfg-tts').value,
     llm_timeout: parseInt(document.getElementById('cfg-llm-timeout').value) || 60,
-    llm_extra_body: document.getElementById('cfg-llm-extra-body').value
+    llm_debug: document.getElementById('cfg-llm-debug').checked,
+    llm_extra_body: document.getElementById('cfg-llm-extra-body').value,
+    streaming: document.getElementById('cfg-streaming').checked,
+    comprehension: document.getElementById('cfg-comprehension').checked
   };
-  await fetch(API + '/settings', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
-  showToast('设置已保存', 'success');
+  var resp = await fetch(API + '/settings', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
+  if (resp.ok) {
+    showToast('设置已保存', 'success');
+  } else {
+    showToast('保存失败：' + resp.status, 'error');
+  }
 }
+
+
 
 
 

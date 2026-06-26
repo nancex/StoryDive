@@ -19,6 +19,17 @@ tailwind.config = {
 }
 </script>
 <style>@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&family=Noto+Serif+SC:wght@400;700&display=swap');
+/* Prevent text cursor / selection on non-input UI elements */
+* { -webkit-user-select: none; user-select: none; }
+input, textarea, [contenteditable] { -webkit-user-select: text; user-select: text; cursor: text; }
+input[type="checkbox"], input[type="radio"] { cursor: pointer; }
+button, .btn-primary, .btn-danger, .btn-ghost, .nav-tab, summary, .card-hover, .cursor-pointer { cursor: pointer; }
+label { cursor: default; }
+label:has(input[type="checkbox"]), label:has(input[type="radio"]), label.cursor-pointer { cursor: pointer; }
+div, span, h1, h2, h3, h4, h5, h6, p, section, article, header, footer { cursor: default; }
+/* Prevent focus outline on non-interactive elements */
+div:not([tabindex]):not([contenteditable]):focus, span:focus, p:focus, h1:focus, h2:focus, h3:focus { outline: none; }
+
 body { font-family: 'Noto Sans SC', sans-serif; }
 .serif { font-family: 'Noto Serif SC', serif; }
 .view { display: none; }
@@ -75,7 +86,10 @@ button:focus-visible { outline: 2px solid #6366f1; outline-offset: 2px; }
 .profile-add-row input { flex: 1; padding: 0.5rem 0.5rem; background: #0f172a; border: none; color: #f1f5f9; font-size: 0.8rem; outline: none; min-width: 0; }
 .profile-add-row input:focus { background: #1a1f2e; }
 .profile-add-row button { padding: 0.5rem 0.65rem; background: #6366f1; color: white; border: none; font-size: 0.8rem; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
-.profile-add-row button:hover { background: #4f46e5; }</style>
+.profile-add-row button:hover { background: #4f46e5; }
+.stream-arrow { text-align: center; color: #6366f1; font-size: 1.2rem; margin-top: 0.5rem; animation: blink 1s ease-in-out infinite; cursor: pointer; user-select: none; font-family: monospace; }
+@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.2; } }
+.dialog-text-streaming .dialog-text { transition: none; }</style>
 </head>
 <body class="bg-surface-900 text-surface-100 min-h-screen">
 
@@ -124,7 +138,21 @@ button:focus-visible { outline: 2px solid #6366f1; outline-offset: 2px; }
           <div><label class="text-sm text-surface-300">Base URL</label><input id="cfg-llm-url" class="input-field mt-1" placeholder="https://api.openai.com/v1"></div>
           <div><label class="text-sm text-surface-300">API Key</label><input id="cfg-llm-key" class="input-field mt-1" type="password" placeholder="sk-..."></div>
           <div><label class="text-sm text-surface-300">Model Name</label><input id="cfg-llm-model" class="input-field mt-1" placeholder="gpt-4o"></div><div><label class="text-sm text-surface-300">Timeout (seconds)</label><input id="cfg-llm-timeout" class="input-field mt-1" type="number" min="10" max="300" placeholder="60"></div>
-          <div><label class="text-sm text-surface-300">额外请求参数 (JSON)</label><textarea id="cfg-llm-extra-body" class="input-field mt-1" rows="3" placeholder='{"thinking": {"type": "enabled"}}'></textarea></div>
+          <div><label class="text-sm text-surface-300">额外请求参数 (JSON)</label><textarea id="cfg-llm-extra-body" class="input-field mt-1" rows="3" placeholder=''{"thinking": {"type": "enabled"}}''></textarea></div>
+          <div class="space-y-3 pt-1">
+            <label class="flex items-center gap-2 text-sm text-surface-300 cursor-pointer">
+              <span class="toggle-switch"><input type="checkbox" id="cfg-streaming"><span class="toggle-slider"></span></span>
+              启用 Streaming（段落渐进显示）
+            </label>
+            <label class="flex items-center gap-2 text-sm text-surface-300 cursor-pointer">
+              <span class="toggle-switch"><input type="checkbox" id="cfg-comprehension"><span class="toggle-slider"></span></span>
+              开始剧本时生成深度理解总结
+            </label>
+            <label class="flex items-center gap-2 text-sm text-surface-300 cursor-pointer">
+              <span class="toggle-switch"><input type="checkbox" id="cfg-llm-debug"><span class="toggle-slider"></span></span>
+              启用 LLM 请求与响应打印（调试用）
+            </label>
+          </div>
         </div>
         <div class="flex justify-end mt-3"><button id="btn-test-llm" class="btn-primary text-xs px-4 py-1.5" onclick="testApi('llm')">测试连接</button></div>
       </fieldset>
@@ -238,7 +266,6 @@ button:focus-visible { outline: 2px solid #6366f1; outline-offset: 2px; }
   <div class="dialog-box p-5 min-h-[160px] cursor-pointer relative" id="dialog-area" onclick="advanceParagraph()">
     <div id="dialog-speaker" class="text-primary-300 font-bold text-lg mb-1 min-h-[1.5rem]"></div>
     <div id="dialog-text" class="text-surface-100 text-base leading-relaxed serif"></div>
-    <div id="dialog-hint" class="text-surface-500 text-xs mt-3">点击继续</div>
   </div>
   <div class="bg-surface-900/95 border-t border-surface-700/50 p-3">
     <div class="flex gap-3 items-end max-w-4xl mx-auto">
@@ -309,6 +336,12 @@ button:focus-visible { outline: 2px solid #6366f1; outline-offset: 2px; }
 </script>
 </body>
 </html>
+
+
+
+
+
+
 
 
 

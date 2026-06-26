@@ -105,6 +105,11 @@ function populateSettingsForm(s) {
   document.getElementById('cfg-img-key').value = s.image_api_key || '';
   document.getElementById('cfg-img-model').value = s.image_model || '';
   document.getElementById('cfg-tts').value = s.tts_endpoint || '';
-  document.getElementById('cfg-llm-timeout').value = s.llm_timeout || 60;
+  document.getElementById('cfg-llm-timeout').value = s.llm_timeout != null ? s.llm_timeout : 60;
+  document.getElementById('cfg-llm-debug').checked = s.llm_debug === true;
   document.getElementById('cfg-llm-extra-body').value = s.llm_extra_body || '';
+  document.getElementById('cfg-streaming').checked = s.streaming !== false;
+  document.getElementById('cfg-comprehension').checked = s.comprehension !== false;
 }
+
+

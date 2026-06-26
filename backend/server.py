@@ -13,15 +13,10 @@ app.add_middleware(
 app.include_router(router)
 
 if __name__ == "__main__":
-    import uvicorn, logging
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s [%(levelname)s] %(message)s",
-        datefmt="%H:%M:%S",
-    )
+    import uvicorn
     log_config = {
         "version": 1,
-        "disable_existing_loggers": False,
+        "disable_existing_loggers": True,
         "formatters": {
             "plain": {
                 "format": "%(asctime)s [%(levelname)s] %(message)s",
@@ -32,8 +27,9 @@ if __name__ == "__main__":
             "plain": {"class": "logging.StreamHandler", "formatter": "plain"}
         },
         "loggers": {
-            "uvicorn": {"handlers": ["plain"], "level": "INFO"},
-            "uvicorn.access": {"handlers": ["plain"], "level": "INFO"},
+            "": {"handlers": ["plain"], "level": "INFO"},
+            "uvicorn": {"level": "INFO"},
+            "uvicorn.access": {"level": "INFO"}
         },
     }
     uvicorn.run(app, host="0.0.0.0", port=8800, log_config=log_config)

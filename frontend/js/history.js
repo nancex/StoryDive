@@ -26,10 +26,7 @@ function renderHistory() {
 }
 
 function exportHistory() {
-  var text = storyHistory.map(function(p) {
-    if (p.type === 'dialogue') return p.text;
-    return p.text;
-  }).join('\n\n');
+  var text = storyHistory.map(function(p) { return p.text; }).join('\n\n');
   var blob = new Blob([text], {type: 'text/plain;charset=utf-8'});
   var url = URL.createObjectURL(blob);
   var a = document.createElement('a');

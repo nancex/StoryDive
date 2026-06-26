@@ -8,8 +8,6 @@ def load_json(p):
 def load_md(p):
     return open(p, "r", encoding="utf-8").read() if p.exists() else ""
 
-def load_txt(p):
-    return open(p, "r", encoding="utf-8").read() if p.exists() else ""
 
 def save_md(p, c):
     p.parent.mkdir(parents=True, exist_ok=True)
