@@ -52,6 +52,15 @@ body { font-family: 'Noto Sans SC', sans-serif; }
 .preview-line { padding: 0.5rem 0.75rem; border-left: 2px solid #334155; margin: 0.25rem 0; color: #cbd5e1; font-size: 0.875rem; }
 .preview-line.dialogue { border-left-color: #6366f1; }
 .toast-visible { opacity: 1; transform: translate(-50%, 0); }
+.toggle-switch { position: relative; display: inline-block; width: 36px; height: 20px; flex-shrink: 0; }
+.toggle-switch input { opacity: 0; width: 0; height: 0; }
+.toggle-switch input:focus-visible { outline: none; }
+.toggle-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background: #334155; border-radius: 20px; transition: 0.25s ease; }
+.toggle-slider::before { position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px; background: #cbd5e1; border-radius: 50%; transition: 0.25s ease; }
+.toggle-switch input:checked + .toggle-slider { background: #6366f1; }
+.toggle-switch input:checked + .toggle-slider::before { transform: translateX(16px); background: #fff; }
+button:focus { outline: none; }
+
 </style>
 </head>
 <body class="bg-surface-900 text-surface-100 min-h-screen">
@@ -101,7 +110,7 @@ body { font-family: 'Noto Sans SC', sans-serif; }
           <div><label class="text-sm text-surface-300">Base URL</label><input id="cfg-llm-url" class="input-field mt-1" placeholder="https://api.openai.com/v1"></div>
           <div><label class="text-sm text-surface-300">API Key</label><input id="cfg-llm-key" class="input-field mt-1" type="password" placeholder="sk-..."></div>
           <div><label class="text-sm text-surface-300">Model Name</label><input id="cfg-llm-model" class="input-field mt-1" placeholder="gpt-4o"></div><div><label class="text-sm text-surface-300">Timeout (seconds)</label><input id="cfg-llm-timeout" class="input-field mt-1" type="number" min="10" max="300" placeholder="60"></div>
-          <div class="flex items-center gap-2 pt-1"><input type="checkbox" id="cfg-llm-reasoning" class="w-4 h-4 rounded border-surface-600 bg-surface-800 text-primary-500 focus:ring-primary-500"><label for="cfg-llm-reasoning" class="text-sm text-surface-300 cursor-pointer">启用深度推理（仅 deepseek-* 模型生效）</label></div>
+          <div><label class="text-sm text-surface-300">额外请求参数 (JSON)</label><textarea id="cfg-llm-extra-body" class="input-field mt-1" rows="3" placeholder='{"thinking": {"type": "enabled"}}'></textarea></div>
         </div>
         <div class="flex justify-end mt-3"><button id="btn-test-llm" class="btn-primary text-xs px-4 py-1.5" onclick="testApi('llm')">测试连接</button></div>
       </fieldset>
@@ -197,7 +206,7 @@ body { font-family: 'Noto Sans SC', sans-serif; }
         <div class="flex items-center justify-between p-4 border-b border-surface-700">
           <span class="font-bold text-white">历史文本回顾</span>
           <div class="flex gap-3 items-center">
-            <label class="flex items-center gap-1 text-xs text-surface-400 cursor-pointer"><input type="checkbox" id="hist-show-speaker" onchange="renderHistory()"> 显示说话主体</label>
+            <label class="flex items-center gap-1.5 text-xs text-surface-400 cursor-pointer"><span class="toggle-switch"><input type="checkbox" id="hist-show-speaker" onchange="renderHistory()"><span class="toggle-slider"></span></span> 显示说话主体</label>
             <button class="btn-ghost" onclick="exportHistory()">导出文本</button>
             <button class="text-surface-400 hover:text-white text-xl" onclick="toggleHistory()">&times;</button>
           </div>
@@ -216,9 +225,9 @@ body { font-family: 'Noto Sans SC', sans-serif; }
       </div>
       <div class="flex flex-col gap-2">
         <div class="flex gap-2">
-          <label class="flex items-center gap-1 text-xs text-surface-400 cursor-pointer"><input type="checkbox" id="toggle-speak" onchange="updateActionMode()"> Speak</label>
-          <label class="flex items-center gap-1 text-xs text-surface-400 cursor-pointer"><input type="checkbox" id="toggle-regret" onchange="updateActionMode()"> Regret</label>
-          <label class="flex items-center gap-1 text-xs text-surface-400 cursor-pointer"><input type="checkbox" id="toggle-accelerate" onchange="updateActionMode()"> Accel</label>
+          <label class="flex items-center gap-1.5 text-xs text-surface-400 cursor-pointer"><span class="toggle-switch"><input type="checkbox" id="toggle-speak" onchange="updateActionMode()"><span class="toggle-slider"></span></span> Speak</label>
+          <label class="flex items-center gap-1.5 text-xs text-surface-400 cursor-pointer"><span class="toggle-switch"><input type="checkbox" id="toggle-regret" onchange="updateActionMode()"><span class="toggle-slider"></span></span> Regret</label>
+          <label class="flex items-center gap-1.5 text-xs text-surface-400 cursor-pointer"><span class="toggle-switch"><input type="checkbox" id="toggle-accelerate" onchange="updateActionMode()"><span class="toggle-slider"></span></span> Accel</label>
         </div>
         <button id="btn-submit" class="btn-primary text-sm px-4 py-2" onclick="submitAction()" disabled>发送</button>
       </div>
@@ -277,6 +286,11 @@ body { font-family: 'Noto Sans SC', sans-serif; }
 </script>
 </body>
 </html>
+
+
+
+
+
 
 
 

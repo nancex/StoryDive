@@ -83,10 +83,14 @@ async def call_llm(messages, settings, tools=None):
     if tools:
         payload["tools"] = tools
         payload["tool_choice"] = "auto"
-    # DeepSeek reasoning support
-    if model.lower().startswith("deepseek-") and settings.get("llm_reasoning", False):
-        payload["reasoning_effort"] = "high"
-        payload["extra_body"] = {"thinking": {"type": "enabled"}}
+    # Extra request body parameters (user-supplied JSON)
+    extra_body_str = settings.get("llm_extra_body", "")
+    if extra_body_str and extra_body_str.strip():
+        try:
+            extra_body = json.loads(extra_body_str)
+            payload["extra_body"] = extra_body
+        except json.JSONDecodeError:
+            pass
     debug = settings.get("llm_debug", False)
     if debug:
         print(f"\n=== LLM REQUEST ===\nURL: {url}\nModel: {model}\nPayload:\n{json.dumps(payload, ensure_ascii=False, indent=2)}\n=== END REQUEST ===")
@@ -199,7 +203,7 @@ No reference sections are currently loaded. You may call `set_reference_sections
 
 
 # ---- NARRATIVE GENERATION ----
-async def generate_narrative(book_id, save_id, action=None, mode="normal"):
+async def generate_narrative(book_id, save_id, action=None, speak=False, regret=False, accelerate=False):
     settings = load_settings()
     if not settings.get("llm_api_key") or settings["llm_api_key"] == "sk-placeholder":
         raise RuntimeError("请先在设置中配置 LLM API Key")
@@ -210,14 +214,16 @@ async def generate_narrative(book_id, save_id, action=None, mode="normal"):
 
     sp = build_system_prompt(book_id, save_id)
     parts = [f'# Script: {cfg["title"]}', f'# Protagonist: {protagonist}']
-    if mode == "speak":
-        parts.append(f'\n## Player Action\n[{protagonist}] said: "{action}"\nGenerate story based on this dialogue.')
-    elif mode == "accelerate":
-        parts.append('\n## Accelerate\nFast-forward. Summarize transition under 200 words, jump to next key scene.')
+    if speak and action:
+        parts.append(f'\n## Player Action (Speak)\n[{protagonist}] said: "{action}"\nGenerate story based on this dialogue.')
     elif action:
         parts.append(f'\n## Player Action\n{action}\nGenerate story based on this.')
     else:
         parts.append('\n## Begin\nStart the story from the beginning.')
+    if regret:
+        parts.append('\n## Regret\nRetract/undo the last narrative segment. Rewind the story state.')
+    if accelerate:
+        parts.append('\n## Accelerate\nFast-forward through time. Summarize transition under 200 words, jump to next key scene.')
 
     story_snip = story[-2000:] if len(story) > 2000 else story
     parts.append(f'\n## Current Story (tail)\n{story_snip}')
@@ -298,4 +304,6 @@ def parse_narrative_response(content_text):
         return [{"type": "narration", "text": content_text.strip()}]
 
     return None
+
+
 

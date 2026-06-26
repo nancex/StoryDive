@@ -9,10 +9,10 @@ var storyHistory = [];
 var longPressTimer = null;
 var autoPlayInterval = null;
 var isAutoPlaying = false;
-var actionMode = 'normal';
 var bookDetailCache = {};
 var genStartTime = 0;
 var genTimerInterval = null;
 var currentMemo = '';
 var currentReferenceSections = [];
 var availableSections = [];
+

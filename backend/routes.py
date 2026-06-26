@@ -84,7 +84,7 @@ async def start_book(book_id: str):
         "book_author": d.get("original_author", ""),
         "protagonist": d.get("protagonist", ""),
         "created": datetime.now().isoformat(),
-        "reference_sections": [],
+        "reference_sections": d.get("reference_sections", []),
     }
     with open(sd / "config.json", "w", encoding="utf-8") as f:
         json.dump(scfg, f, ensure_ascii=False, indent=2)
@@ -188,14 +188,15 @@ async def submit_action(req: ActionRequest):
             raise HTTPException(404)
         cfg = load_json(sd / "config.json")
         bid = cfg["book_id"]
-        if req.mode == "regret":
+        if req.regret:
             prune_story(req.save_id, req.target_paragraph_index or 0)
-        queue = await generate_narrative(bid, req.save_id, req.action, req.mode)
-        if req.mode != "regret":
+        queue = await generate_narrative(bid, req.save_id, req.action,
+                                          speak=req.speak, regret=req.regret, accelerate=req.accelerate)
+        if not req.regret:
             append_to_story(req.save_id, queue)
         settings = load_settings()
         is_mock = not settings.get("llm_api_key") or settings["llm_api_key"] == "sk-placeholder"
-        return {"paragraph_queue": queue, "mode": req.mode, "mock": is_mock}
+        return {"paragraph_queue": queue, "mock": is_mock}
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -236,3 +237,4 @@ def save_settings(data: SettingsData):
     with open(sp, "w", encoding="utf-8") as f:
         json.dump(data.model_dump(), f, ensure_ascii=False, indent=2)
     return {"status": "ok"}
+

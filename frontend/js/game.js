@@ -6,7 +6,6 @@ function enterGameStage(title) {
   document.getElementById('dialog-text').innerHTML = '';
   document.getElementById('dialog-hint').style.display = 'block';
   setActionInputDisabled(true);
-  updateToggleStates();
   renderParagraph();
 }
 
@@ -123,33 +122,10 @@ document.addEventListener('keydown', function(e) {
 });
 
 // ── ACTION SUBMISSION ──
-function updateActionMode() {
-  var speak = document.getElementById('toggle-speak').checked;
-  var regret = document.getElementById('toggle-regret').checked;
-  var accel = document.getElementById('toggle-accelerate').checked;
-  if (speak) {
-    document.getElementById('toggle-regret').checked = false;
-    document.getElementById('toggle-accelerate').checked = false;
-    actionMode = 'speak';
-  } else if (regret) {
-    document.getElementById('toggle-speak').checked = false;
-    document.getElementById('toggle-accelerate').checked = false;
-    actionMode = 'regret';
-  } else if (accel) {
-    document.getElementById('toggle-speak').checked = false;
-    document.getElementById('toggle-regret').checked = false;
-    actionMode = 'accelerate';
-  } else {
-    actionMode = 'normal';
-  }
-  updateToggleStates();
-}
-
-function updateToggleStates() {
-  document.getElementById('toggle-speak').checked = actionMode === 'speak';
-  document.getElementById('toggle-regret').checked = actionMode === 'regret';
-  document.getElementById('toggle-accelerate').checked = actionMode === 'accelerate';
-}
+// Speak, Regret, Accelerate are independent toggles — all can be active simultaneously.
+// Their onchange handler is intentionally empty; submitAction reads their states directly.
+function updateActionMode() {}
+function updateToggleStates() {}
 
 var _submitting = false;
 
@@ -165,7 +141,11 @@ async function submitAction() {
   var origText = btn.textContent;
   startGenTimer(btn);
 
-  if (actionMode === 'regret') {
+  var speak = document.getElementById('toggle-speak').checked;
+  var regret = document.getElementById('toggle-regret').checked;
+  var accelerate = document.getElementById('toggle-accelerate').checked;
+
+  if (regret) {
     paragraphQueue = paragraphQueue.slice(0, paragraphIndex);
     paragraphIndex = paragraphQueue.length;
   }
@@ -178,8 +158,10 @@ async function submitAction() {
       body: JSON.stringify({
         save_id: currentSaveId,
         action: text,
-        mode: actionMode,
-        target_paragraph_index: actionMode === 'regret' ? paragraphIndex : null
+        speak: speak,
+        regret: regret,
+        accelerate: accelerate,
+        target_paragraph_index: regret ? paragraphIndex : null
       })
     });
   } catch(e) {
@@ -208,9 +190,8 @@ async function submitAction() {
   _submitting = false;
   setActionInputDisabled(true);
   renderParagraph();
-  actionMode = 'normal';
-  updateToggleStates();
   // Reload memo/refs in case LLM updated them via tools
   reloadMemoAndRefs();
 }
+
 

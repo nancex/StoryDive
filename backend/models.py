@@ -42,7 +42,9 @@ class SaveDetail(BaseModel):
 class ActionRequest(BaseModel):
     save_id: str
     action: str
-    mode: str = "normal"
+    speak: bool = False
+    regret: bool = False
+    accelerate: bool = False
     target_paragraph_index: Optional[int] = None
 
 class SettingsData(BaseModel):
@@ -55,10 +57,12 @@ class SettingsData(BaseModel):
     tts_endpoint: str = ""
     llm_timeout: int = 60
     llm_debug: bool = False
-    llm_reasoning: bool = False
+    llm_extra_body: str = ""
 
 class MemoUpdateRequest(BaseModel):
     memo: str
 
 class ReferenceUpdateRequest(BaseModel):
     sections: List[str]
+
+

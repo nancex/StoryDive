@@ -11,7 +11,7 @@ async function loadSettings() {
     document.getElementById('cfg-img-model').value = s.image_model || '';
     document.getElementById('cfg-tts').value = s.tts_endpoint || '';
     document.getElementById('cfg-llm-timeout').value = s.llm_timeout || 60;
-    document.getElementById('cfg-llm-reasoning').checked = s.llm_reasoning || false;
+    document.getElementById('cfg-llm-extra-body').value = s.llm_extra_body || '';
   } catch(e) {}
 }
 
@@ -25,8 +25,9 @@ async function saveSettings() {
     image_model: document.getElementById('cfg-img-model').value,
     tts_endpoint: document.getElementById('cfg-tts').value,
     llm_timeout: parseInt(document.getElementById('cfg-llm-timeout').value) || 60,
-    llm_reasoning: document.getElementById('cfg-llm-reasoning').checked
+    llm_extra_body: document.getElementById('cfg-llm-extra-body').value
   };
   await fetch(API + '/settings', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
   showToast('设置已保存', 'success');
 }
+

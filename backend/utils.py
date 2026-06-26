@@ -1,4 +1,4 @@
-import json
+import json, re
 from .config import BOOKS_DIR, SAVES_DIR
 
 def load_json(p):
@@ -78,7 +78,7 @@ def list_available_sections(book_id):
     if not src_dir.exists():
         return []
     sections = []
-    for f in sorted(src_dir.iterdir()):
+    for f in sorted(src_dir.iterdir(), key=lambda p: [int(c) if c.isdigit() else c.lower() for c in re.split(r'(\d+)', p.stem)]):
         if f.suffix in (".md", ".txt"):
             sections.append(f.stem)
     return sections
@@ -107,3 +107,4 @@ def load_settings():
     from .models import SettingsData
     sp = BOOKS_DIR.parent / "settings.json"
     return load_json(sp) if sp.exists() else SettingsData().model_dump()
+
