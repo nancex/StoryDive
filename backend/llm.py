@@ -20,6 +20,59 @@ MAX_TOOL_ROUNDS = 3            # max tool-calling rounds in generate_narrative
 DEFAULT_TIMEOUT = 60           # default LLM request timeout (seconds)
 CONNECT_TIMEOUT = 10.0         # connection timeout (seconds)
 
+# ── Prompt templates ──
+COMPREHENSION_SYSTEM_PROMPT = """You are a story analyst for the narrative engine of "{title}".
+Read the Setting and Story Index below carefully. Produce a concise structured summary in Chinese covering:
+1. Key characters and their relationships, personalities, motivations
+2. World rules, power systems, important locations
+3. Major plot arcs and turning points per chapter/section
+4. The protagonist's current situation at the story's starting point
+
+IMPORTANT: After the summary, append a "Section Map" section listing each chapter with its section IDs in a JSON array format, like:
+## Section Map
+- ch1: ["ch1_1", "ch1_2", "ch1_3"]
+- ch2: ["ch2_1", "ch2_2"]
+This map is critical for the narrative engine to load relevant source sections on demand.
+
+Keep the summary under 2000 words. Write in plain paragraphs, no JSON needed (except the Section Map at the end)."""
+
+NARRATIVE_SYSTEM_PROMPT_RULES = """## Core Rules
+1. Write narrative paragraphs separated by blank lines.
+2. Narration paragraphs: plain text describing actions, scenery, internal thoughts.
+3. Dialogue paragraphs: start with "Speaker: " then the dialogue. Example: "Emilia: Where am I?"
+   For dialogue, you may hint expression in parentheses after the speaker name, e.g. "Speaker (expression): text".
+   Common expressions: neutral, happy, sad, angry, surprised, determined, nervous, scared, calm, confused, shocked, weary, laughing, embarrassed, smug, worried, grinning, suspicious.
+4. Use third-person limited POV following the protagonist. Show their thoughts and perceptions naturally within narration.
+5. Generate 4-8 paragraphs. Last paragraph must be a natural break point for player input.
+6. Maintain the original work's language style, pacing, and tone. Match the source material's prose quality.
+7. DO NOT output JSON or code blocks. Output plain text paragraphs only, separated by blank lines.
+
+## Narrative Quality
+- Write vivid, immersive prose. Show, don't tell.
+- Blend dialogue with action and description. Avoid long stretches of pure dialogue.
+- Each paragraph should advance the story meaningfully.
+- Respect the established world rules, power systems, and character personalities.
+- Pay close attention to the timeline: the source material may use flashbacks or non-linear narrative techniques. Follow the story's chronological order, starting from the earliest events. Use the comprehension and index to determine the correct temporal sequence.
+- When the player takes an action that deviates from the original plot, consult the comprehension to judge whether the deviation may intersect with characters, locations, or events not covered by currently loaded reference sections. If so, call `set_reference_sections` (see below).
+
+## Tools Available
+You have access to the following tools. Call them when appropriate, using the tool calling mechanism. After calling a tool, wait for the result, then generate the narrative.
+
+- `update_memo(memo_text)`: Update the memo with important story state, character relationships, evolving plot clues, and any new information worth remembering. The memo persists across requests and helps maintain consistency. Write concisely in Chinese.
+- `set_reference_sections(section_ids)`: Set which source sections to load as reference. Pass an array of section IDs like ["ch1_1", "ch1_2"] or [] to clear. Use the Section Map in the comprehension to find relevant section IDs. Call this when the story moves to a new scene/chapter or when the player's actions intersect with unloaded content.
+
+## Strategy
+- Default: skip tools and generate narrative paragraphs immediately.
+- Call tools when:
+  - The story has clearly moved into a new scene or chapter needing different reference sections -> call `set_reference_sections`.
+  - You have learned critical new plot/character information worth recording -> call `update_memo`.
+  - The player's action deviates from the original plot: check if the deviation may intersect with characters, locations, or events not covered by currently loaded reference sections. If so, call `set_reference_sections` to load the relevant source material.
+- Keep memo updates concise and incremental. Focus on what changed or what's newly discovered.
+"""
+
+NARRATIVE_FORMAT_REMINDER = "\n## CRITICAL FORMAT REMINDER\n- EVERY dialogue line MUST start with \"SpeakerName: \" (e.g. \"Emilia: Where am I?\")\n- Narration is plain text without any prefix.\n- Separate each paragraph with ONE blank line.\n- NEVER output JSON, code blocks, or markdown formatting."
+
+
 # ── Debug output helper (raw fd write to stderr, un-bufferable) ──
 def _debug_print(msg: str):
     '''Write directly to stderr file descriptor, bypassing all Python io buffering and uvicorn capture.'''
@@ -197,20 +250,7 @@ async def generate_comprehension(book_id, save_id):
     index = load_md(BOOKS_DIR / book_id / "index.md")
     cfg = load_json(BOOKS_DIR / book_id / "config.json")
 
-    system = f"""You are a story analyst for the narrative engine of "{cfg['title']}".
-Read the Setting and Story Index below carefully. Produce a concise structured summary in Chinese covering:
-1. Key characters and their relationships, personalities, motivations
-2. World rules, power systems, important locations
-3. Major plot arcs and turning points per chapter/section
-4. The protagonist's current situation at the story's starting point
-
-IMPORTANT: After the summary, append a "Section Map" section listing each chapter with its section IDs in a JSON array format, like:
-## Section Map
-- ch1: ["ch1_1", "ch1_2", "ch1_3"]
-- ch2: ["ch2_1", "ch2_2"]
-This map is critical for the narrative engine to load relevant source sections on demand.
-
-Keep the summary under 2000 words. Write in plain paragraphs, no JSON needed (except the Section Map at the end)."""
+    system = COMPREHENSION_SYSTEM_PROMPT.format(title=cfg["title"])
 
     user = f"## Setting\n{setting}\n\n## Story Index\n{index}"
 
@@ -282,42 +322,9 @@ def build_system_prompt(book_id, save_id=None):
                     parts.append(f"\n### {sec_id}\n{content}")
                     total_ref_chars += len(content)
 
-    parts.append("""
-## Core Rules
-1. Write narrative paragraphs separated by blank lines.
-2. Narration paragraphs: plain text describing actions, scenery, internal thoughts.
-3. Dialogue paragraphs: start with "Speaker: " then the dialogue. Example: "Emilia: Where am I?"
-   For dialogue, you may hint expression in parentheses after the speaker name, e.g. "Speaker (expression): text".
-   Common expressions: neutral, happy, sad, angry, surprised, determined, nervous, scared, calm, confused, shocked, weary, laughing, embarrassed, smug, worried, grinning, suspicious.
-4. Use third-person limited POV following the protagonist. Show their thoughts and perceptions naturally within narration.
-5. Generate 4-8 paragraphs. Last paragraph must be a natural break point for player input.
-6. Maintain the original work's language style, pacing, and tone. Match the source material's prose quality.
-7. DO NOT output JSON or code blocks. Output plain text paragraphs only, separated by blank lines.
+    parts.append(NARRATIVE_SYSTEM_PROMPT_RULES)
 
-## Narrative Quality
-- Write vivid, immersive prose. Show, don't tell.
-- Blend dialogue with action and description. Avoid long stretches of pure dialogue.
-- Each paragraph should advance the story meaningfully.
-- Respect the established world rules, power systems, and character personalities.
-- Pay close attention to the timeline: the source material may use flashbacks or non-linear narrative techniques. Follow the story's chronological order, starting from the earliest events. Use the comprehension and index to determine the correct temporal sequence.
-- When the player takes an action that deviates from the original plot, consult the comprehension to judge whether the deviation may intersect with characters, locations, or events not covered by currently loaded reference sections. If so, call `set_reference_sections` (see below).
-
-## Tools Available
-You have access to the following tools. Call them when appropriate, using the tool calling mechanism. After calling a tool, wait for the result, then generate the narrative.
-
-- `update_memo(memo_text)`: Update the memo with important story state, character relationships, evolving plot clues, and any new information worth remembering. The memo persists across requests and helps maintain consistency. Write concisely in Chinese.
-- `set_reference_sections(section_ids)`: Set which source sections to load as reference. Pass an array of section IDs like ["ch1_1", "ch1_2"] or [] to clear. Use the Section Map in the comprehension to find relevant section IDs. Call this when the story moves to a new scene/chapter or when the player's actions intersect with unloaded content.
-
-## Strategy
-- Default: skip tools and generate narrative paragraphs immediately.
-- Call tools when:
-  - The story has clearly moved into a new scene or chapter needing different reference sections → call `set_reference_sections`.
-  - You have learned critical new plot/character information worth recording → call `update_memo`.
-  - The player's action deviates from the original plot: check if the deviation may intersect with characters, locations, or events not covered by currently loaded reference sections. If so, call `set_reference_sections` to load the relevant source material.
-- Keep memo updates concise and incremental. Focus on what changed or what's newly discovered.
-""")
-
-    parts.append("\n## CRITICAL FORMAT REMINDER\n- EVERY dialogue line MUST start with \"SpeakerName: \" (e.g. \"Emilia: Where am I?\")\n- Narration is plain text without any prefix.\n- Separate each paragraph with ONE blank line.\n- NEVER output JSON, code blocks, or markdown formatting.")
+    parts.append(NARRATIVE_FORMAT_REMINDER)
     return "\n".join(parts)
 
 # ---- NARRATIVE GENERATION ----
@@ -347,12 +354,28 @@ async def generate_narrative(book_id, save_id, action=None, speak=False, regret=
 
     story_snip = story[-1*STORY_TAIL_CHARS:] if len(story) > STORY_TAIL_CHARS else story
     parts.append(f'\n## Current Story (tail)\n{story_snip}')
-    parts.append('\n## OUTPUT FORMAT (MANDATORY)\n- Dialogue: "Speaker: text" (e.g. "Emilia: I understand.")\n- Narration: plain text without prefix\n- Separate paragraphs with ONE blank line\n- NO JSON, NO markdown, NO code blocks')
+    # parts.append('\n## OUTPUT FORMAT (MANDATORY)\n- Dialogue: "Speaker: text" (e.g. "Emilia: I understand.")\n- Narration: plain text without prefix\n- Separate paragraphs with ONE blank line\n- NO JSON, NO markdown, NO code blocks')
 
     messages = [
         {"role": "system", "content": sp},
         {"role": "user", "content": "\n".join(parts)}
     ]
+
+    # Tool-calling pre-loop: let LLM update memo / reference sections before generating narrative
+    for _ in range(MAX_TOOL_ROUNDS):
+        resp_msg = await call_llm(messages, settings, tools=TOOL_DEFS)
+        tool_calls = resp_msg.get("tool_calls", [])
+        if not tool_calls:
+            break
+        messages.append(resp_msg)
+        for tc in tool_calls:
+            result = execute_tool_call(tc, book_id, save_id)
+            messages.append({
+                "role": "tool",
+                "tool_call_id": tc["id"],
+                "content": result
+            })
+        messages[0] = {"role": "system", "content": build_system_prompt(book_id, save_id)}
 
     try:
         buffer = ""
