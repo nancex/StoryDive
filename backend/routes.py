@@ -105,7 +105,12 @@ async def start_book(book_id: str):
     with open(sd / "config.json", "w", encoding="utf-8") as f:
         json.dump(scfg, f, ensure_ascii=False, indent=2)
     save_md(sd / "story.md", f"# {d['title']}\n\n")
-    save_md(sd / "memo.md", "# 备忘录\n\n游戏刚开始。\n")
+    # Use book-level pre-defined memo if available, otherwise default
+    book_memo = BOOKS_DIR / book_id / "memo.md"
+    if book_memo.exists():
+        save_md(sd / "memo.md", load_md(book_memo))
+    else:
+        save_md(sd / "memo.md", "# 备忘录\n\n游戏刚开始。\n")
     try:
         settings = load_settings()
         if settings.get("comprehension", True):
