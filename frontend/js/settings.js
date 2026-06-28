@@ -25,7 +25,8 @@ async function saveSettings() {
     llm_timeout: parseInt(document.getElementById('cfg-llm-timeout').value) || 60,
     llm_debug: document.getElementById('cfg-llm-debug').checked,
     llm_extra_body: document.getElementById('cfg-llm-extra-body').value,
-    comprehension: document.getElementById('cfg-comprehension').checked
+    comprehension: document.getElementById('cfg-comprehension').checked,
+    use_predefined_opening: document.getElementById('cfg-predefined-opening').checked
   };
   var resp = await fetch(API + '/settings', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
   if (resp.ok) {
@@ -34,8 +35,3 @@ async function saveSettings() {
     showToast('保存失败：' + resp.status, 'error');
   }
 }
-
-
-
-
-

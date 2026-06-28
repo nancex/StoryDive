@@ -387,10 +387,11 @@ def _parse_paragraph_line(text):
     text = text.strip()
     if not text:
         return None
-    m = re.match(r'^(.+?):\s+(.+)$', text)
+    m = re.match(r'^(.+?)[:：]\s+(.+)$', text)
     if m:
         speaker = m.group(1).strip()
         if speaker and len(speaker) < SPEAKER_MAX_LEN and not speaker.startswith("http") and not speaker.startswith("#"):
+            speaker = re.sub(r"\s*[(（][^)）]*[)）]\s*$", "", speaker).strip()
             return {"type": "dialogue", "speaker": speaker, "text": m.group(2).strip()}
     return {"type": "narration", "text": text}
 

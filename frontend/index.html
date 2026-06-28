@@ -145,6 +145,10 @@ button:focus-visible { outline: 2px solid #6366f1; outline-offset: 2px; }
               开始剧本时生成深度理解总结
             </label>
             <label class="flex items-center gap-2 text-sm text-surface-300 cursor-pointer">
+              <span class="toggle-switch"><input type="checkbox" id="cfg-predefined-opening" checked><span class="toggle-slider"></span></span>
+              使用剧本预定义开头（如有 start.txt）
+            </label>
+            <label class="flex items-center gap-2 text-sm text-surface-300 cursor-pointer">
               <span class="toggle-switch"><input type="checkbox" id="cfg-llm-debug"><span class="toggle-slider"></span></span>
               启用 LLM 请求与响应打印（调试用）
             </label>

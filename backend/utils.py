@@ -23,10 +23,11 @@ def parse_story_to_paragraphs(text):
         line = line.strip()
         if not line:
             continue
-        if ": " in line and not line.startswith("#") and not line.startswith("-"):
-            parts = line.split(": ", 1)
+        if (": " in line or "： " in line or "：" in line) and not line.startswith("#") and not line.startswith("-"):
+            parts = re.split(r"[:：]\s+", line, maxsplit=1) if re.search(r"[:：]\s+", line) else ["", ""]
             sp = parts[0].strip()
             if sp and len(sp) < 30 and not sp.startswith("http"):
+                sp = re.sub(r"\s*[(（][^)）]*[)）]\s*$", "", sp).strip()
                 pars.append({"type": "dialogue", "speaker": sp, "text": parts[1].strip()})
                 continue
         pars.append({"type": "narration", "text": line})

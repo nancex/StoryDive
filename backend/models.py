@@ -59,6 +59,7 @@ class SettingsData(BaseModel):
     llm_debug: bool = False
     llm_extra_body: str = ""
     comprehension: bool = True
+    use_predefined_opening: bool = True
 
 class MemoUpdateRequest(BaseModel):
     memo: str
@@ -66,13 +67,8 @@ class MemoUpdateRequest(BaseModel):
 class ReferenceUpdateRequest(BaseModel):
     sections: List[str]
 
-
-
 class ProfileSwitchRequest(BaseModel):
     name: str
 
 class ProfileCreateRequest(BaseModel):
     name: str
-
-
-

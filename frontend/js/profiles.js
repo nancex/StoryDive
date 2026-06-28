@@ -109,6 +109,5 @@ function populateSettingsForm(s) {
   document.getElementById('cfg-llm-debug').checked = s.llm_debug === true;
   document.getElementById('cfg-llm-extra-body').value = s.llm_extra_body || '';
   document.getElementById('cfg-comprehension').checked = s.comprehension !== false;
+  document.getElementById('cfg-predefined-opening').checked = s.use_predefined_opening !== false;
 }
-
-

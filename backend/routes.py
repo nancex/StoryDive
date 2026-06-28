@@ -1,4 +1,4 @@
-import json, uuid, shutil
+import json, uuid, shutil, re
 from datetime import datetime
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
@@ -18,6 +18,19 @@ from .utils import (
 from .llm import generate_narrative, generate_comprehension
 
 router = APIRouter(prefix="/api")
+
+def _parse_para_text(para_text: str):
+    """Parse a single paragraph text into {type, text, speaker?} dict."""
+    text = para_text.strip()
+    if not text:
+        return None
+    m = re.match(r'^(.+?)[:：]\s+(.+)$', text)
+    if m:
+        speaker = m.group(1).strip()
+        if speaker and len(speaker) < 30 and not speaker.startswith("http") and not speaker.startswith("#"):
+            speaker = re.sub(r"\s*[(（][^)）]*[)）]\s*$", "", speaker).strip()
+            return {"type": "dialogue", "speaker": speaker, "text": m.group(2).strip()}
+    return {"type": "narration", "text": text}
 
 
 # ---- BOOKS ----
@@ -206,18 +219,32 @@ async def submit_action(req: ActionRequest):
 
     async def event_stream():
         queue_buf = []
-        async for event in generate_narrative(bid, req.save_id, req.action,
+        settings = load_settings()
+        use_predefined = settings.get("use_predefined_opening", True)
+        start_txt_path = BOOKS_DIR / bid / "start.txt"
+        predefined_content = None
+        if not req.action and use_predefined and start_txt_path.exists():
+            predefined_content = load_md(start_txt_path).strip()
+        if predefined_content:
+            paragraphs = [p.strip() for p in predefined_content.split("\n\n") if p.strip()]
+            for i, para_text in enumerate(paragraphs):
+                para_text = " ".join(para_text.split("\n"))
+                para = _parse_para_text(para_text)
+                if para:
+                    queue_buf.append(para)
+                    yield f"data: {json.dumps({'type': 'paragraph', 'index': i + 1, 'para': para})}\n\n"
+            yield f"data: {json.dumps({'type': 'done', 'total': len(queue_buf)})}\n\n"
+        else:
+            async for event in generate_narrative(bid, req.save_id, req.action,
                                                        speak=req.speak, regret=req.regret,
                                                        accelerate=req.accelerate):
-            # Collect paragraphs for story saving
-            if "paragraph" in event:
-                try:
-                    data = json.loads(event[6:])
-                    queue_buf.append(data["para"])
-                except Exception:
-                    pass
-            yield event
-        # After stream done, save to story
+                if "paragraph" in event:
+                    try:
+                        data = json.loads(event[6:])
+                        queue_buf.append(data["para"])
+                    except Exception:
+                        pass
+                yield event
         if queue_buf:
             append_to_story(req.save_id, queue_buf)
 
