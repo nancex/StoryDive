@@ -119,7 +119,6 @@ dialogArea.addEventListener('pointerdown', function(e) {
     autoPlayInterval = setInterval(function() {
       if (paragraphIndex >= paragraphQueue.length - 1) {
         stopAutoPlay();
-  clearInterval(genTimerInterval); genTimerInterval = null;
         paragraphIndex++;
         renderParagraph();
         return;
@@ -171,82 +170,28 @@ var _streamingCurrentIdx = 0;
 var _streamingDone = false;
 var _streamAbort = null;
 
-async function submitAction() {
-  if (_submitting) return;
-  var input = document.getElementById('action-input');
-  var text = input.value.trim();
-  if (!text) return;
-  if (!await checkApiHealth()) return;
-
-  var streaming = document.getElementById('cfg-streaming') && document.getElementById('cfg-streaming').checked;
-
-  var speak = document.getElementById('toggle-speak').checked;
-  var regret = document.getElementById('toggle-regret').checked;
-  var accelerate = document.getElementById('toggle-accelerate').checked;
-
-  if (regret) {
-    paragraphQueue = paragraphQueue.slice(0, paragraphIndex);
-    paragraphIndex = paragraphQueue.length;
+async function submitAction(text, speak, regret, accelerate, bookTitle, isFirstStart, startBtn) {
+  // If called from UI (no params), read from DOM before any guards
+  if (arguments.length === 0) {
+    if (_submitting) return;
+    var input = document.getElementById("action-input");
+    text = input.value.trim();
+    if (!text) return;
+    if (!await checkApiHealth()) return;
+    speak = document.getElementById("toggle-speak").checked;
+    regret = document.getElementById("toggle-regret").checked;
+    accelerate = document.getElementById("toggle-accelerate").checked;
+    if (regret) {
+      paragraphQueue = paragraphQueue.slice(0, paragraphIndex);
+      paragraphIndex = paragraphQueue.length;
+    }
   }
 
-  if (streaming) {
-    await submitActionStream(text, speak, regret, accelerate);
-  } else {
-    await submitActionNormal(text, speak, regret, accelerate);
-  }
-}
-
-async function submitActionNormal(text, speak, regret, accelerate) {
+  if (!text && !isFirstStart) return;
+  if (!text && isFirstStart) { /* first start, no user input */ }
+  if (_submitting && !isFirstStart) return;
   _submitting = true;
-  var input = document.getElementById('action-input');
-  input.value = '';
-  var btn = document.getElementById('btn-submit');
-  var origText = btn.textContent;
-  startGenTimer(btn);
 
-  var res;
-  try {
-    res = await fetch(API + '/game/action', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        save_id: currentSaveId, action: text,
-        speak: speak, regret: regret, accelerate: accelerate,
-        target_paragraph_index: regret ? paragraphIndex : null
-      })
-    });
-  } catch(e) {
-    showToast('请求失败：' + e.message, 'error');
-    _submitting = false;
-    if (!isFirstStart) { stopGenTimer(btn, origText); }
-    setActionInputDisabled(false);
-    return;
-  }
-  var data = await res.json();
-  if (!isFirstStart) { stopGenTimer(btn, origText); }
-  if (data.error) {
-    showToast('生成失败：' + data.error, 'error');
-    _submitting = false;
-    setActionInputDisabled(false);
-    return;
-  }
-  paragraphQueue = data.paragraph_queue || [];
-  if (!paragraphQueue.length) {
-    showToast('LLM 未返回有效内容，请重试', 'error');
-    _submitting = false;
-    setActionInputDisabled(false);
-    return;
-  }
-  paragraphIndex = 0;
-  _lastHistoryIdx = -1;
-  _submitting = false;
-  setActionInputDisabled(true);
-  renderParagraph();
-  reloadMemoAndRefs();
-}
-
-async function submitActionStream(text, speak, regret, accelerate, bookTitle, isFirstStart, startBtn) {
-  _submitting = true;
   _streamingQueue = [];
   _streamingCurrentIdx = 0;
   _streamingDone = false;
@@ -274,7 +219,7 @@ async function submitActionStream(text, speak, regret, accelerate, bookTitle, is
   var _firstStartEntered = false;
 
   try {
-    var res = await fetch(API + '/game/action/stream', {
+    var res = await fetch(API + '/game/action', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -443,13 +388,15 @@ function advanceStreamParagraph() {
   }
 }
 
-var _origAdvanceParagraph = advanceParagraph;
 advanceParagraph = function() {
   if (!_streamingDone && (_streamAbort || _streamingQueue.length > 0)) {
     if (_streamingCurrentIdx >= paragraphQueue.length - 1) return;
     advanceStreamParagraph();
     return;
   }
-  _origAdvanceParagraph();
+  if (isAutoPlaying) return;
+  if (paragraphIndex >= paragraphQueue.length) return;
+  paragraphIndex++;
+  renderParagraph();
 };
 

@@ -15,7 +15,7 @@ from .utils import (
     load_all_settings, save_all_settings,
     list_available_sections,
 )
-from .llm import generate_narrative, generate_narrative_stream, generate_comprehension
+from .llm import generate_narrative, generate_comprehension
 
 router = APIRouter(prefix="/api")
 
@@ -73,7 +73,7 @@ def list_book_sections(book_id: str):
 
 
 @router.post("/books/{book_id}/start")
-async def start_book(book_id: str, comprehension_only: bool = False):
+async def start_book(book_id: str):
     c = BOOKS_DIR / book_id / "config.json"
     if not c.exists():
         raise HTTPException(404)
@@ -94,26 +94,12 @@ async def start_book(book_id: str, comprehension_only: bool = False):
     save_md(sd / "story.md", f"# {d['title']}\n\n")
     save_md(sd / "memo.md", "# 备忘录\n\n游戏刚开始。\n")
     try:
-        # Phase 1: Generate comprehension summary if enabled
         settings = load_settings()
         if settings.get("comprehension", True):
             await generate_comprehension(book_id, sid)
-        # If comprehension_only, return early for streaming first narrative
-        if comprehension_only:
-            return {
-                "save_id": sid,
-                "book_title": d["title"],
-                "memo": load_md(sd / "memo.md"),
-                "reference_sections": load_save_config(sid).get("reference_sections", []),
-                "existing_saves": get_saves_for_book(book_id),
-            }
-        # Phase 2: Generate opening narrative
-        queue = await generate_narrative(book_id, sid)
-        append_to_story(sid, queue)
         return {
             "save_id": sid,
             "book_title": d["title"],
-            "paragraph_queue": queue,
             "memo": load_md(sd / "memo.md"),
             "reference_sections": load_save_config(sid).get("reference_sections", []),
             "existing_saves": get_saves_for_book(book_id),
@@ -207,32 +193,9 @@ async def continue_save(save_id: str):
     }
 
 
-# ---- GAME ----
+# ---- GAME ACTION ----
 @router.post("/game/action")
 async def submit_action(req: ActionRequest):
-    try:
-        sd = SAVES_DIR / req.save_id
-        if not sd.exists():
-            raise HTTPException(404)
-        cfg = load_json(sd / "config.json")
-        bid = cfg["book_id"]
-        if req.regret:
-            prune_story(req.save_id, req.target_paragraph_index or 0)
-        queue = await generate_narrative(bid, req.save_id, req.action,
-                                          speak=req.speak, regret=req.regret, accelerate=req.accelerate)
-        if not req.regret:
-            append_to_story(req.save_id, queue)
-        settings = load_settings()
-        is_mock = not settings.get("llm_api_key") or settings["llm_api_key"] == "sk-placeholder"
-        return {"paragraph_queue": queue, "mock": is_mock}
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return {"error": str(e), "paragraph_queue": [], "mock": False}
-
-# ---- GAME ACTION (STREAMING) ----
-@router.post("/game/action/stream")
-async def submit_action_stream(req: ActionRequest):
     sd = SAVES_DIR / req.save_id
     if not sd.exists():
         raise HTTPException(404)
@@ -243,7 +206,7 @@ async def submit_action_stream(req: ActionRequest):
 
     async def event_stream():
         queue_buf = []
-        async for event in generate_narrative_stream(bid, req.save_id, req.action,
+        async for event in generate_narrative(bid, req.save_id, req.action,
                                                        speak=req.speak, regret=req.regret,
                                                        accelerate=req.accelerate):
             # Collect paragraphs for story saving
@@ -255,7 +218,7 @@ async def submit_action_stream(req: ActionRequest):
                     pass
             yield event
         # After stream done, save to story
-        if queue_buf and not req.regret:
+        if queue_buf:
             append_to_story(req.save_id, queue_buf)
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")

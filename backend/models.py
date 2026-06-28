@@ -58,7 +58,6 @@ class SettingsData(BaseModel):
     llm_timeout: int = 60
     llm_debug: bool = False
     llm_extra_body: str = ""
-    streaming: bool = True
     comprehension: bool = True
 
 class MemoUpdateRequest(BaseModel):

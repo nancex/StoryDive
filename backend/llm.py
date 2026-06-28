@@ -103,7 +103,7 @@ def execute_tool_call(tool_call, book_id, save_id):
         return json.dumps({"success": True, "message": f"已设置参考小节: {section_ids}"})
     return json.dumps({"error": f"Unknown function: {func_name}"})
 
-# ---- LLM CLIENT (non-streaming) ----
+# ---- LLM CLIENT ----
 async def call_llm(messages, settings, tools=None):
     url = (settings.get("llm_base_url", "") or "https://api.openai.com/v1").rstrip("/") + "/chat/completions"
     key = settings.get("llm_api_key", "")
@@ -139,6 +139,7 @@ async def call_llm(messages, settings, tools=None):
             cache_hit_rate = f"{(cached_tokens / prompt_tokens * 100):.1f}%" if prompt_tokens > 0 else "N/A"
             print(f"[TOKEN] input={prompt_tokens} output={completion_tokens} total={total_tokens} cache_hit={cache_hit_rate}")
         return data["choices"][0]["message"]
+
 
 # ---- LLM CLIENT (streaming) ----
 async def call_llm_stream(messages, settings):
@@ -176,10 +177,10 @@ async def call_llm_stream(messages, settings):
                     try:
                         chunk = json.loads(data_str)
                         delta = chunk["choices"][0].get("delta", {})
-                        content = delta.get("content", "")
-                        if content:
-                            streamed_text += content
-                            yield content
+                        text = delta.get("content", "")
+                        if text:
+                            streamed_text += text
+                            yield text
                     except (json.JSONDecodeError, KeyError, IndexError):
                         pass
             if debug:
@@ -319,70 +320,9 @@ You have access to the following tools. Call them when appropriate, using the to
     parts.append("\n## CRITICAL FORMAT REMINDER\n- EVERY dialogue line MUST start with \"SpeakerName: \" (e.g. \"Emilia: Where am I?\")\n- Narration is plain text without any prefix.\n- Separate each paragraph with ONE blank line.\n- NEVER output JSON, code blocks, or markdown formatting.")
     return "\n".join(parts)
 
-# ---- NARRATIVE GENERATION (non-streaming, with tool calling) ----
+# ---- NARRATIVE GENERATION ----
 async def generate_narrative(book_id, save_id, action=None, speak=False, regret=False, accelerate=False):
-    settings = load_settings()
-    if not settings.get("llm_api_key") or settings["llm_api_key"] == "sk-placeholder":
-        raise RuntimeError("请先在设置中配置 LLM API Key")
-
-    cfg = load_json(BOOKS_DIR / book_id / "config.json")
-    story = load_md(SAVES_DIR / save_id / "story.md")
-    protagonist = cfg.get("protagonist", "protagonist")
-
-    sp = build_system_prompt(book_id, save_id)
-    parts = [f'# Script: {cfg["title"]}', f'# Protagonist: {protagonist}']
-    if speak and action:
-        parts.append(f'\n## Player Action (Speak)\n[{protagonist}] said: "{action}"\nGenerate story based on this dialogue.')
-    elif action:
-        parts.append(f'\n## Player Action\n{action}\nGenerate story based on this.')
-    else:
-        parts.append('\n## Begin\nStart the story from the beginning.')
-    if regret:
-        parts.append('\n## Regret\nRetract/undo the last narrative segment. Rewind the story state.')
-    if accelerate:
-        parts.append('\n## Accelerate\nFast-forward through time. Summarize transition under 200 words, jump to next key scene.')
-
-    story_snip = story[-1*STORY_TAIL_CHARS:] if len(story) > STORY_TAIL_CHARS else story
-    parts.append(f'\n## Current Story (tail)\n{story_snip}')
-    messages = [
-        {"role": "system", "content": sp},
-        {"role": "user", "content": "\n".join(parts)}
-    ]
-
-    max_tool_rounds = MAX_TOOL_ROUNDS
-    for round_num in range(max_tool_rounds):
-        resp_msg = await call_llm(messages, settings, tools=TOOL_DEFS)
-        tool_calls = resp_msg.get("tool_calls")
-        if tool_calls:
-            messages.append({"role": "assistant", "content": resp_msg.get("content"), "tool_calls": tool_calls})
-            for tc in tool_calls:
-                tool_result = execute_tool_call(tc, book_id, save_id)
-                messages.append({"role": "tool", "tool_call_id": tc["id"], "content": tool_result})
-            messages[0]["content"] = build_system_prompt(book_id, save_id)
-            continue
-
-        content_text = resp_msg.get("content", "")
-        paragraphs = [p.strip() for p in content_text.split("\n\n") if p.strip()]
-        result = []
-        for p in paragraphs:
-            p_clean = re.sub(r'^\d+[\.\),、]\s*', '', p)
-            p_clean = re.sub(r'^[-\*]\s*', '', p_clean)
-            para = _parse_paragraph_line(p_clean)
-            if para:
-                result.append(para)
-        if len(result) >= 2:
-            return result
-        if round_num < max_tool_rounds - 1:
-            messages.append({"role": "assistant", "content": content_text})
-            messages.append({"role": "user", "content": 'You must output narrative paragraphs separated by blank lines. Each dialogue line must start with "SpeakerName: ". Narration lines are plain text. No JSON, no code blocks.'})
-            continue
-        raise RuntimeError("LLM 连续多次未返回有效段落，请重试")
-
-    raise RuntimeError("LLM 未返回有效段落")
-
-# ---- NARRATIVE GENERATION (streaming) ----
-async def generate_narrative_stream(book_id, save_id, action=None, speak=False, regret=False, accelerate=False):
-    """Generator that yields SSE event strings for streaming narrative generation."""
+    """Async generator yielding SSE events with character-by-character streaming."""
     settings = load_settings()
     if not settings.get("llm_api_key") or settings["llm_api_key"] == "sk-placeholder":
         yield f"data: {json.dumps({'error': '请先在设置中配置 LLM API Key'})}\n\n"
@@ -407,8 +347,6 @@ async def generate_narrative_stream(book_id, save_id, action=None, speak=False, 
 
     story_snip = story[-1*STORY_TAIL_CHARS:] if len(story) > STORY_TAIL_CHARS else story
     parts.append(f'\n## Current Story (tail)\n{story_snip}')
-
-    # Add format instruction as a hard constraint in the user prompt
     parts.append('\n## OUTPUT FORMAT (MANDATORY)\n- Dialogue: "Speaker: text" (e.g. "Emilia: I understand.")\n- Narration: plain text without prefix\n- Separate paragraphs with ONE blank line\n- NO JSON, NO markdown, NO code blocks')
 
     messages = [
@@ -422,7 +360,6 @@ async def generate_narrative_stream(book_id, save_id, action=None, speak=False, 
         async for delta in call_llm_stream(messages, settings):
             buffer += delta
             yield f"data: {json.dumps({'type': 'partial', 'text': delta})}\n\n"
-
             while "\n\n" in buffer:
                 idx = buffer.index("\n\n")
                 para_text = buffer[:idx].strip()
@@ -432,20 +369,18 @@ async def generate_narrative_stream(book_id, save_id, action=None, speak=False, 
                     if para:
                         paragraphs_emitted += 1
                         yield f"data: {json.dumps({'type': 'paragraph', 'index': paragraphs_emitted, 'para': para})}\n\n"
-
         remaining = buffer.strip()
         if remaining:
             para = _parse_paragraph_line(remaining)
             if para:
                 paragraphs_emitted += 1
                 yield f"data: {json.dumps({'type': 'paragraph', 'index': paragraphs_emitted, 'para': para})}\n\n"
-
         yield f"data: {json.dumps({'type': 'done', 'total': paragraphs_emitted})}\n\n"
-
     except Exception as e:
-        import traceback, logging
+        import traceback
         traceback.print_exc()
         yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+
 
 def _parse_paragraph_line(text):
     """Parse a single paragraph line into {type, text, speaker?}."""

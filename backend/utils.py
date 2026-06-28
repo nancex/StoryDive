@@ -6,12 +6,16 @@ def load_json(p):
         return json.load(f)
 
 def load_md(p):
-    return open(p, "r", encoding="utf-8").read() if p.exists() else ""
+    if p.exists():
+        with open(p, "r", encoding="utf-8") as f:
+            return f.read()
+    return ""
 
 
 def save_md(p, c):
     p.parent.mkdir(parents=True, exist_ok=True)
-    open(p, "w", encoding="utf-8").write(c)
+    with open(p, "w", encoding="utf-8") as f:
+        f.write(c)
 
 def parse_story_to_paragraphs(text):
     pars = []
@@ -22,7 +26,7 @@ def parse_story_to_paragraphs(text):
         if ": " in line and not line.startswith("#") and not line.startswith("-"):
             parts = line.split(": ", 1)
             sp = parts[0].strip()
-            if sp and len(sp) < 20 and not sp.startswith("http"):
+            if sp and len(sp) < 30 and not sp.startswith("http"):
                 pars.append({"type": "dialogue", "speaker": sp, "text": parts[1].strip()})
                 continue
         pars.append({"type": "narration", "text": line})
@@ -134,7 +138,9 @@ def save_all_settings(data):
 
 def save_json(p, data):
     """Save a dict as JSON file."""
+    p.parent.mkdir(parents=True, exist_ok=True)
     with open(p, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
+
 
 

@@ -15,4 +15,10 @@ var genTimerInterval = null;
 var currentMemo = '';
 var currentReferenceSections = [];
 var availableSections = [];
+var _streamingQueue = [];
+var _streamingCurrentIdx = 0;
+var _streamingDone = false;
+var _streamAbort = null;
+var _lastHistoryIdx = -1;
+var _submitting = false;
 

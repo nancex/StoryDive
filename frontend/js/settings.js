@@ -25,7 +25,6 @@ async function saveSettings() {
     llm_timeout: parseInt(document.getElementById('cfg-llm-timeout').value) || 60,
     llm_debug: document.getElementById('cfg-llm-debug').checked,
     llm_extra_body: document.getElementById('cfg-llm-extra-body').value,
-    streaming: document.getElementById('cfg-streaming').checked,
     comprehension: document.getElementById('cfg-comprehension').checked
   };
   var resp = await fetch(API + '/settings', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });

@@ -92,54 +92,17 @@ async function openSavePicker(bookId, saves) {
   }
 }
 
+
+
 async function startBook() {
   if (!currentBookId) return;
   if (!await checkApiHealth()) return;
   if (!await checkLlmHealth()) return;
-  var startBtn = document.getElementById('bm-start-btn');
-
-  var streaming = document.getElementById('cfg-streaming') && document.getElementById('cfg-streaming').checked;
-
-  if (streaming) {
-    await startBookStreaming(startBtn);
-  } else {
-    await startBookNormal(startBtn);
-  }
-}
-
-async function startBookNormal(startBtn) {
+  var startBtn = document.getElementById("bm-start-btn");
   startGenTimer(startBtn);
   var res;
   try {
     res = await fetch(API + '/books/' + currentBookId + '/start', { method: 'POST' });
-  } catch(e) {
-    showToast('请求失败：' + e.message, 'error');
-    stopGenTimer(startBtn, '开始新剧本');
-    return;
-  }
-  var data = await res.json();
-  if (data.error || res.status >= 400) {
-    stopGenTimer(startBtn, '开始新剧本');
-    showToast('生成失败：' + (data.error || data.detail || '未知错误'), 'error');
-    return;
-  }
-  closeBookModal();
-  currentSaveId = data.save_id;
-  paragraphQueue = data.paragraph_queue || [];
-  paragraphIndex = 0;
-  storyHistory = [];
-  currentMemo = data.memo || '';
-  currentReferenceSections = data.reference_sections || [];
-  stopGenTimer(startBtn, '开始新剧本');
-  loadAvailableSections();
-  enterGameStage(data.book_title);
-}
-
-async function startBookStreaming(startBtn) {
-  startGenTimer(startBtn);
-  var res;
-  try {
-    res = await fetch(API + '/books/' + currentBookId + '/start?comprehension_only=true', { method: 'POST' });
   } catch(e) {
     showToast('请求失败：' + e.message, 'error');
     stopGenTimer(startBtn, '开始新剧本');
@@ -164,7 +127,7 @@ async function startBookStreaming(startBtn) {
   paragraphIndex = 0;
   loadAvailableSections();
   // Stay on browse view until first content arrives from streaming
-  await submitActionStream('', false, false, false, data.book_title, true, startBtn);
+  await submitAction('', false, false, false, data.book_title, true, startBtn);
 }
 
 async function continueBook() {
